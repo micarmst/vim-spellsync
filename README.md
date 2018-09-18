@@ -1,6 +1,6 @@
 # vim-spellsync
 
-Regenerate Vim spell files from word lists at startup. Useful for storing personal dictionaries in source control. Automatically creates `gitignore` and `.gitattributes` in the spell directories to exclude binary spell files from Git and uses its union merge driver to avoid conflicts.
+Regenerate Vim spell files from word lists at startup. Useful for storing personal dictionaries in source control. Automatically creates `.gitignore` and `.gitattributes` in the spell directories to exclude binary spell files from Git and uses its union merge driver to avoid conflicts.
 
 ## Install
 
