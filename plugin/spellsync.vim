@@ -1,5 +1,10 @@
-" Get available spell directories
-let s:dirs = split(globpath(&rtp, 'spell'), '\n')
+" If spellfile exists use that directory
+if (len(&spellfile) > 0)
+	let s:dirs = split(fnamemodify(&spellfile,":h"), '\n')
+" Otherwise get available built-in spell directories
+else
+	let s:dirs = split(globpath(&rtp, 'spell'), '\n')
+endif
 
 " Search each spell directory for word lists
 for s:dir in s:dirs
