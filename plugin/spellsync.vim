@@ -1,6 +1,6 @@
 " If spellfile exists use that directory
 if (len(&spellfile) > 0)
-	let s:dirs = split(fnamemodify(&spellfile,":h"), '\n')
+	let s:dirs = [fnamemodify(&spellfile,":h")]
 " Otherwise get available built-in spell directories
 else
 	let s:dirs = split(globpath(&rtp, 'spell'), '\n')
