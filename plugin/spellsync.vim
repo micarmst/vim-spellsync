@@ -1,49 +1,63 @@
-" If spellfile exists use that directory
-if (len(&spellfile) > 0)
-	let s:dirs = [fnamemodify(&spellfile,":h")]
-" Otherwise get available built-in spell directories
-else
-	let s:dirs = split(globpath(&rtp, 'spell'), '\n')
-endif
+command! SpellSync call s:spellSync()
 
-" Search each spell directory for word lists
-for s:dir in s:dirs
+function! s:spellSync()
+  call s:syncSpellDirs()
+  call s:syncSpellFiles()
+endfunction
 
-  let s:active = 0
-  let s:wordlists = split(globpath(s:dir, '*.add'), '\n')
+function! s:syncSpellDirs()
+  let l:dirs = split(globpath(&runtimepath, 'spell'), '\n')
 
-  " Regenerate spell file for each word list
-  for s:wordlist in s:wordlists
+  for l:dir in l:dirs
+    call s:gitSetupUnionMerge(l:dir)
+    call s:gitIgnoreSpellFiles(l:dir)
+    let l:wordlists = split(globpath(l:dir, '*.add'), '\n')
 
-    if !filewritable(s:wordlist)
-      continue
+    for l:wordlist in l:wordlists
+      call s:buildSpellFile(l:wordlist)
+    endfor
+  endfor
+endfunction
+
+function! s:syncSpellFiles()
+	let l:customSpellFiles = split(&spellfile, ',')
+
+  for l:spellFile in l:customSpellFiles
+    call s:buildSpellFile(l:spellFile)
+
+    let l:dir = fnamemodify(l:spellFile,':h')
+    call s:gitSetupUnionMerge(l:dir)
+    call s:gitIgnoreSpellFiles(l:dir)
+  endfor
+endfunction
+
+function! s:buildSpellFile(wordlist)
+    " Check user has write access to this location
+    if !filewritable(a:wordlist)
+      return
     endif
 
-    let s:active = 1
-    let s:spell_file = s:wordlist . '.spl'
+    let l:spell_file = a:wordlist . '.spl'
 
     " Call mkspell if the spell file is out of date
-    if getftime(s:wordlist) > getftime(s:spell_file)
-      silent exec 'mkspell! ' . fnameescape(s:wordlist)
+    if getftime(a:wordlist) > getftime(l:spell_file)
+      silent! exec 'mkspell! ' . fnameescape(a:wordlist)
     endif
+endfunction
 
-  endfor
-
-  " Create gitignore and gitattributes for active spell folders
-  if s:active
-
-    " gitignore
-    let s:gitignore = s:dir . '/' . '.gitignore'
-    if !filereadable(s:gitignore)
-      call writefile(['*.spl', '*.sug'], s:gitignore)
-    endif
-
-    " gitattributes
-    let s:gitattributes = s:dir . '/' . '.gitattributes'
-    if !filereadable(s:gitattributes)
-      call writefile(['*.add merge=union'], s:gitattributes)
-    endif
-
+function! s:gitSetupUnionMerge(dir)
+  let l:gitattributes = a:dir . '/.gitattributes'
+  if !filereadable(l:gitattributes)
+    silent! call writefile(['*.add merge=union'], l:gitattributes)
   endif
+endfunction
 
-endfor
+function! s:gitIgnoreSpellFiles(dir)
+  let l:gitignore = a:dir . '/.gitignore'
+  if !filereadable(l:gitignore)
+    silent! call writefile(['*.spl', '*.sug'], l:gitignore)
+  endif
+endfunction
+
+"Run at startup
+SpellSync
