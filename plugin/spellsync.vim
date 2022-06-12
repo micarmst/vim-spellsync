@@ -20,7 +20,7 @@ function! s:syncSpellDirs()
 endfunction
 
 function! s:syncSpellFiles()
-	let l:customSpellFiles = split(&spellfile, ',')
+  let l:customSpellFiles = split(&spellfile, ',')
 
   for l:spellFile in l:customSpellFiles
     call s:buildSpellFile(l:spellFile)
