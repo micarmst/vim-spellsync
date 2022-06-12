@@ -3,6 +3,7 @@ command! SpellSync call s:spellSync()
 function! s:spellSync()
   call s:syncSpellDirs()
   call s:syncSpellFiles()
+  call s:spellReload()
 endfunction
 
 function! s:syncSpellDirs()
@@ -57,6 +58,13 @@ function! s:gitIgnoreSpellFiles(dir)
   if !filereadable(l:gitignore)
     silent! call writefile(['*.spl', '*.sug'], l:gitignore)
   endif
+endfunction
+
+function s:spellReload()
+  " Even after rebuilding the spell file, Vim will still highlight new words as
+  " mistakes until it is restarted. Misusing the spellundo command as below
+  " forces Vim to reload its spell check as it attempts to remove a fake word.
+  silent! spellundo U1BFTExTWU5D
 endfunction
 
 "Run at startup
