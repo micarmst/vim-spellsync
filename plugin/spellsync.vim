@@ -1,3 +1,8 @@
+" Options
+if !exists('g:spellsync_run_at_startup')
+    let g:spellsync_run_at_startup = 1
+endif
+
 command! SpellSync call s:spellSync()
 
 function! s:spellSync()
@@ -67,5 +72,9 @@ function s:spellReload()
   silent! spellundo U1BFTExTWU5D
 endfunction
 
-"Run at startup
-SpellSync
+" Run at startup
+if g:spellsync_run_at_startup
+  SpellSync
+  " Test this way out? Might work better with separating the plugin too in to autoload
+  "autocmd VimEnter * SpellSync 
+endif
