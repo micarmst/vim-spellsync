@@ -7,6 +7,10 @@ if !exists('g:spellsync_enable_git_union_merge')
     let g:spellsync_enable_git_union_merge = 1
 endif
 
+if !exists('g:spellsync_enable_git_ignore')
+    let g:spellsync_enable_git_ignore = 1
+endif
+
 command! SpellSync call s:spellSync()
 
 function! s:spellSync()
@@ -65,9 +69,11 @@ function! s:gitSetupUnionMerge(dir)
 endfunction
 
 function! s:gitIgnoreSpellFiles(dir)
-  let l:gitignore = a:dir . '/.gitignore'
-  if !filereadable(l:gitignore)
-    silent! call writefile(['*.spl', '*.sug'], l:gitignore)
+  if g:spellsync_enable_git_ignore
+    let l:gitignore = a:dir . '/.gitignore'
+    if !filereadable(l:gitignore)
+      silent! call writefile(['*.spl', '*.sug'], l:gitignore)
+    endif
   endif
 endfunction
 
