@@ -26,4 +26,4 @@ It also tries to make keeping word lists in source control easier to manage. Fir
 
 * [Sato Katsura explains how to generate spl files](https://vi.stackexchange.com/a/5052/19028)
 * [Using .gitattributes to avoid merge conflicts](https://web.archive.org/web/20181009034917/https://krlmlr.github.io/using-gitattributes-to-avoid-merge-conflicts/)
-
+* [Writing Vim Plugins by Steve Losh](https://stevelosh.com/blog/2011/09/writing-vim-plugins/)
