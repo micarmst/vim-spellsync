@@ -3,6 +3,10 @@ if !exists('g:spellsync_run_at_startup')
     let g:spellsync_run_at_startup = 1
 endif
 
+if !exists('g:spellsync_enable_git_union_merge')
+    let g:spellsync_enable_git_union_merge = 1
+endif
+
 command! SpellSync call s:spellSync()
 
 function! s:spellSync()
@@ -52,9 +56,11 @@ function! s:buildSpellFile(wordlist)
 endfunction
 
 function! s:gitSetupUnionMerge(dir)
-  let l:gitattributes = a:dir . '/.gitattributes'
-  if !filereadable(l:gitattributes)
-    silent! call writefile(['*.add merge=union'], l:gitattributes)
+  if g:spellsync_enable_git_union_merge
+    let l:gitattributes = a:dir . '/.gitattributes'
+    if !filereadable(l:gitattributes)
+      silent! call writefile(['*.add merge=union'], l:gitattributes)
+    endif
   endif
 endfunction
 
