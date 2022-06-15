@@ -25,13 +25,13 @@
 " SOFTWARE.
 
 function! spellsync#Run()
-    call s:run()
+  call s:run()
 endfunction
 
 function! s:run()
-    call s:syncSpellDirs()
-    call s:syncSpellFiles()
-    call s:spellReload()
+  call s:syncSpellDirs()
+  call s:syncSpellFiles()
+  call s:spellReload()
 endfunction
 
 function! s:syncSpellDirs()
@@ -61,17 +61,17 @@ function! s:syncSpellFiles()
 endfunction
 
 function! s:buildSpellFile(wordlist)
-    " Check user has write access to this location
-    if !filewritable(a:wordlist)
-      return
-    endif
+  " Check user has write access to this location
+  if !filewritable(a:wordlist)
+    return
+  endif
 
-    let l:spell_file = a:wordlist . '.spl'
+  let l:spell_file = a:wordlist . '.spl'
 
-    " Call mkspell if the spell file is out of date
-    if getftime(a:wordlist) > getftime(l:spell_file)
-      silent! exec 'mkspell! ' . fnameescape(a:wordlist)
-    endif
+  " Call mkspell if the spell file is out of date
+  if getftime(a:wordlist) > getftime(l:spell_file)
+    silent! exec 'mkspell! ' . fnameescape(a:wordlist)
+  endif
 endfunction
 
 function! s:gitSetupUnionMerge(dir)
