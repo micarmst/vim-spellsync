@@ -86,7 +86,5 @@ endfunction
 
 " Run at startup
 if g:spellsync_run_at_startup
-  SpellSync
-  " Test this way out? Might work better with separating the plugin too in to autoload
-  "autocmd VimEnter * SpellSync 
+  autocmd VimEnter * SpellSync 
 endif
