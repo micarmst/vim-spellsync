@@ -1,6 +1,6 @@
 # 🪄 vim-spellsync
 
-Automatically rebuild Vim spell files from word lists at startup. Useful for storing custom word lists in source control. It also creates `.gitignore` and `.gitattributes` in the spell directories to exclude binary spell files from Git and uses its union merge driver to avoid conflicts.
+Magically rebuild Vim spell files if word lists are modified outside of Vim. One use case would be if word lists are stored in a source control system like Git and shared across multiple computers. SpellSync also creates `.gitignore` and `.gitattributes` files in Vim's spell directories to exclude binary spell files and uses its union merge driver to avoid conflicts.
 
 ## Install
 
@@ -12,7 +12,24 @@ Plug 'micarmst/vim-spellsync'
 
 ## Usage
 
-The spellsync plugin runs automatically at startup. It can also be called with the `:SpellSync` command.
+The plugin runs automatically at startup by default. It can also be called with the `:SpellSync` command.
+
+## Config
+
+Below are the options available and their default values:
+
+```vim
+" Run SpellSync automatically when Vim starts
+let g:spellsync_run_at_startup = 1
+
+" Enable the git union merge option
+" Creates a .gitattributes file in the spell directories if one does not exist
+let g:spellsync_enable_git_union_merge = 1
+
+" Enable Git ignore for binary spell files
+" Creates a .gitignore file in spell directories if one does not exist
+let g:spellsync_enable_git_ignore = 1
+```
 
 ## How it works
 
