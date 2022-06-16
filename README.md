@@ -22,12 +22,12 @@ Below are the options available and their default values:
 " Run SpellSync automatically when Vim starts
 let g:spellsync_run_at_startup = 1
 
-" Enable the git union merge option
+" Enable the Git union merge option
 " Creates a .gitattributes file in the spell directories if one does not exist
 let g:spellsync_enable_git_union_merge = 1
 
 " Enable Git ignore for binary spell files
-" Creates a .gitignore file in spell directories if one does not exist
+" Creates a .gitignore file in the spell directories if one does not exist
 let g:spellsync_enable_git_ignore = 1
 ```
 
