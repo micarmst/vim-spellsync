@@ -1,0 +1,98 @@
+*spellsync.txt* magically rebuild Vim spell files
+
+               \│/  ╔═╗╔═╗╔═╗╦  ╦  ╔═╗╦ ╦╔╗╔╔═╗  ~
+            ──── ─  ╚═╗╠═╝║╣ ║  ║  ╚═╗╚╦╝║║║║    ~
+               /│\  ╚═╝╩  ╚═╝╩═╝╩═╝╚═╝ ╩ ╝╚╝╚═╝  ~
+                   Magically rebuild spell files ~
+                     (plus other incantations)   ~
+ 
+====================================================================
+CONTENTS                                           *SpellSyncContents*
+
+    1. Overview.............. |SpellSyncOverview|
+    2. Usage ................ |SpellSyncUsage|
+    3. Config ............... |SpellSyncConfig|
+    4. License .............. |SpellSyncLicense|
+    5. Bugs ................. |SpellSyncBugs|
+    6. Contributing ......... |SpellSyncContributing|
+    7. Changelog ............ |SpellSyncChangelog|
+
+====================================================================
+1. Overview                                        *SpellSyncOverview*
+
+SpellSync rebuilds Vim spell files if word lists are modified
+externally. One use case would be if word lists are stored in
+a source control system like Git and shared across multiple
+computers.
+
+SpellSync also creates `.gitignore` and `.gitattributes` files in
+Vim's spell directories to exclude binary spell files and uses its
+union merge driver to avoid conflicts.
+
+====================================================================
+2. Usage                                              *SpellSyncUsage*
+
+The plugin runs automatically at startup by default. It can also be
+called with the command: >
+
+    :SpellSync
+
+====================================================================
+3. Config                                            *SpellSyncConfig*
+
+Below are the options available and their default values.
+
+Run SpellSync automatically when Vim starts: >
+
+    let g:spellsync_run_at_startup = 1
+
+Enable the Git union merge option. Creates a `.gitattributes` file
+in the spell directories if one does not exist: >
+
+    let g:spellsync_enable_git_union_merge = 1
+
+Enable Git ignore for binary spell files. Creates a `.gitignore`
+file in the spell directories if one does not exist: >
+
+    let g:spellsync_enable_git_ignore = 1
+
+====================================================================
+4. License                                          *SpellSyncLicense*
+
+SpellSync is released under the MIT license. See `LICENSE.MD` for
+further details.
+
+====================================================================
+5. Bugs                                                *SpellSyncBugs*
+
+Please submit any bug reports to the project's GitHub issue tracker:
+
+    https://github.com/micarmst/vim-spellsync/issues
+
+====================================================================
+6. Contributing                                *SpellSyncContributing*
+
+Contributions are welcome, feel free to submit a pull request:
+
+    https://github.com/micarmst/vim-spellsync
+
+====================================================================
+7. Changelog                                      *SpellSyncChangelog*
+
+v0.1.0
+    * FIX: Learn semantic versioning
+    * ADD: force a spell reload after rebuilding
+    * ADD: configuration options
+    * ADD: write this documentation
+    * CHANGE: refactor code
+    * CHANGE: move main functions to autoload
+v0.0.4
+    * FIX: handling multiple custom spell files
+    * FIX: learn how to write Vimscript
+    * CHANGE: refactor code
+v0.0.3
+    * ADD: handle custom spell files. Thanks Gavin-Paolucci-Kleinow
+v0.0.2
+    * Subsequent stable release
+v0.0.1
+    * Initial unstable release
