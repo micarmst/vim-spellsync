@@ -25,10 +25,6 @@
 " SOFTWARE.
 
 function! spellsync#Run()
-  call s:run()
-endfunction
-
-function! s:run()
   call s:syncSpellDirs()
   call s:syncSpellFiles()
   call s:spellReload()
