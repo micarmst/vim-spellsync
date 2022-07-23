@@ -37,7 +37,6 @@ function! s:syncSpellDirs()
     call s:gitSetupUnionMerge(l:dir)
     call s:gitIgnoreSpellFiles(l:dir)
     let l:wordlists = split(globpath(l:dir, '*.add'), '\n')
-
     for l:wordlist in l:wordlists
       call s:buildSpellFile(l:wordlist)
     endfor
@@ -46,13 +45,11 @@ endfunction
 
 function! s:syncSpellFiles()
   let l:customSpellFiles = split(&spellfile, ',')
-
   for l:spellFile in l:customSpellFiles
-    call s:buildSpellFile(l:spellFile)
-
     let l:dir = fnamemodify(l:spellFile,':h')
     call s:gitSetupUnionMerge(l:dir)
     call s:gitIgnoreSpellFiles(l:dir)
+    call s:buildSpellFile(l:spellFile)
   endfor
 endfunction
 
@@ -88,7 +85,7 @@ function! s:gitIgnoreSpellFiles(dir)
   endif
 endfunction
 
-function s:spellReload()
+function! s:spellReload()
   " Even after rebuilding the spell file, Vim will still highlight new words as
   " mistakes until it is restarted. Misusing the spellundo command as below
   " forces Vim to reload its spell check as it attempts to remove a fake word.
