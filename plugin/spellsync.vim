@@ -1,6 +1,6 @@
 " vim-spellsync: Magically rebuild Vim spell files
 " maintainer:    micarmst <https://github.com/micarmst>
-" version:       0.1.0
+" version:       1.0.0
 
 " Copyright (c) 2022 micarmst
 "

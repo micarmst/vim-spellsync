@@ -79,19 +79,24 @@ Contributions are welcome, feel free to submit a pull request:
 ====================================================================
 7. Changelog                                      *SpellSyncChangelog*
 
+v1.0.0
+    * ADD: Plugin attribution comment for generated files
+        * Suggested by John Karahalis (openjck)
 v0.1.0
     * FIX: Learn semantic versioning
-    * ADD: force a spell reload after rebuilding
-    * ADD: configuration options
-    * ADD: write this documentation
-    * CHANGE: refactor code
-    * CHANGE: move main functions to autoload
+    * ADD: Force a spell reload after rebuilding
+    * ADD: Configuration options
+    * ADD: Write this documentation
+    * CHANGE: Refactor code
+    * CHANGE: Move main functions to autoload
 v0.0.4
-    * FIX: handling multiple custom spell files
-    * FIX: learn how to write Vimscript
-    * CHANGE: refactor code
+    * FIX: Handling multiple custom spell files
+        * Reported by Andrew Burns (ErebusBat)
+    * FIX: Learn how to write Vimscript
+    * CHANGE: Refactor code
 v0.0.3
-    * ADD: handle custom spell files. Thanks Gavin-Paolucci-Kleinow
+    * ADD: Handle custom spell files
+        * Contributed by Gabby Paolucci
 v0.0.2
     * Subsequent stable release
 v0.0.1
