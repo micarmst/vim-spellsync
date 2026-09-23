@@ -119,6 +119,10 @@ class SpellSyncTests(unittest.TestCase):
             function! TestWarning(path, reason) abort
               let warnings = split(execute('messages'), "\\n")
               call filter(warnings, 'stridx(v:val, "SpellSync: ") == 0')
+              " globpath() uses native separators on Windows.
+              if has('win32')
+                call map(warnings, 'tr(v:val, nr2char(92), "/")')
+              endif
               call filter(warnings, 'stridx(v:val, a:path) >= 0 && stridx(v:val, a:reason) >= 0')
               call assert_false(empty(warnings), 'Missing warning for ' . a:path . ': ' . a:reason)
             endfunction
@@ -256,6 +260,10 @@ class SpellSyncTests(unittest.TestCase):
             call assert_equal(['', ''], spellbadword('spellsyncword'))
             call assert_notmatch('SpellSync:', execute('messages'))
         """, before="""
+            " Older Vim rejects the comma escape unless it is in 'isfname'.
+            if !has('nvim') && !has('patch-9.1.783')
+              set isfname+=92
+            endif
             let &spellfile = escape(g:test_root . '/custom, words/words.utf-8.add', ',')
             call TestSpelling()
         """)
@@ -264,7 +272,9 @@ class SpellSyncTests(unittest.TestCase):
     def test_runtime_path_with_escaped_comma(self):
         path = self.wordlist("extra, runtime/spell/ssbase.utf-8.add")
         self.vim("""
+            let original_isfname = &isfname
             SpellSync
+            call assert_equal(original_isfname, &isfname)
             call assert_equal(['', ''], spellbadword('spellsyncword'))
             call assert_notmatch('SpellSync:', execute('messages'))
         """, before="""
@@ -559,6 +569,7 @@ class SpellSyncTests(unittest.TestCase):
         self.compile(source)
         binary = Path(str(source) + ".spl")
         source.write_text("newspellsyncword\n", encoding="utf-8")
+        original = source.read_bytes()
         os.utime(binary, (946684800, 946684800))
         os.utime(source, (946684810, 946684810))
         link = self.root / "custom/words.utf-8.add"
@@ -577,7 +588,7 @@ class SpellSyncTests(unittest.TestCase):
         """)
         self.assertTrue(link.is_symlink())
         self.assertTrue(output.is_symlink())
-        self.assertEqual(b"newspellsyncword\n", source.read_bytes())
+        self.assertEqual(original, source.read_bytes())
 
     def test_dangling_wordlist_symlinks_are_reported(self):
         link = self.root / "runtime/spell/aa.utf-8.add"

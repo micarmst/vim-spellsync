@@ -4,6 +4,8 @@ Magically rebuild Vim spell files if word lists are modified outside of Vim. One
 
 ## Install
 
+Tested with Vim 8.2.1926 or newer (with spell support) and Neovim 0.5.0 or newer.
+
 Using a plugin manager like [vim-plug](https://github.com/junegunn/vim-plug):
 
 ```vim
@@ -15,6 +17,8 @@ Plug 'micarmst/vim-spellsync'
 The plugin runs automatically at startup by default. It can also be called with the `:SpellSync` command.
 
 Read-only word lists are supported when their binary spell files can be created or updated. If a file cannot be read or written, SpellSync reports the path and reason and continues with the other dictionaries. Use `:messages` to review warnings, including Git configuration and spell-refresh failures. Missing word lists are skipped.
+
+Vim before 9.1.0783 requires `set isfname+=92` before configuring a custom `'spellfile'` path containing an escaped comma. SpellSync handles this editor limitation automatically when refreshing dictionaries discovered through `'runtimepath'`.
 
 ## Config
 

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test:
-    name: ${{ matrix.editor }} on ${{ matrix.os }}
+    name: ${{ matrix.editor }} ${{ matrix.version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -18,6 +18,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         editor: [vim, nvim]
+        version: [stable]
+        include:
+          - os: ubuntu-latest
+            editor: vim
+            version: v8.2.1926
+          - os: ubuntu-latest
+            editor: nvim
+            version: v0.5.0
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,6 +37,6 @@ jobs:
         id: editor
         with:
           neovim: ${{ matrix.editor == 'nvim' }}
-          version: stable
+          version: ${{ matrix.version }}
       - name: Run regression tests
         run: python tests/test_spellsync.py --editor "${{ steps.editor.outputs.executable }}" -v

@@ -155,10 +155,18 @@ function! s:warn(path, message) abort
 endfunction
 
 function! s:setSpellOption(option, value) abort
+  let l:isfname = &isfname
   try
+    " Before 9.1.0783 Vim validates the escape in '\,' as a filename
+    " character, although its option parser already understands the escape.
+    if a:option ==# 'spellfile' && !has('nvim') && !has('patch-9.1.783')
+      silent noautocmd set isfname+=92
+    endif
     execute 'silent noautocmd let &l:' . a:option . ' = a:value'
   catch /^Vim\%((\a\+)\)\=:E/
     call s:warn(a:option, 'could not refresh spell checking: ' . v:exception)
+  finally
+    silent noautocmd let &isfname = l:isfname
   endtry
 endfunction
 

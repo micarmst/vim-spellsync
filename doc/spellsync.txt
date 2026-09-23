@@ -25,6 +25,9 @@ externally. One use case would be if word lists are stored in
 a source control system like Git and shared across multiple
 computers.
 
+Tested with Vim 8.2.1926 or newer (with spell support) and Neovim
+0.5.0 or newer.
+
 SpellSync also creates `.gitignore` and `.gitattributes` files in
 Vim's spell directories to exclude binary spell files and uses its
 union merge driver to avoid conflicts.
@@ -52,6 +55,11 @@ reported. Use |:messages| to review warnings after startup or a sync.
 If a binary path points to a directory or other non-file entry, the
 final spell refresh is deferred until that path is fixed. Other
 dictionaries are still rebuilt.
+
+On Vim before 9.1.0783, use `set isfname+=92` before assigning a
+custom 'spellfile' path containing an escaped comma. SpellSync handles
+this limitation itself when refreshing runtime dictionaries, restoring
+the original 'isfname' afterwards.
 
 ====================================================================
 3. Config                                            *SpellSyncConfig*
@@ -96,6 +104,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Refresh comma-containing runtime paths on older Vim and make
+           warning and file-preservation tests portable to Windows
     * FIX: Compile readable word lists without requiring source write
            access; check existing binary or destination directory access
     * FIX: Report file and refresh failures while continuing the sync

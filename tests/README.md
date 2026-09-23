@@ -136,11 +136,15 @@ It requests `stable` from `rhysd/action-setup-vim`; that action uses a current
 Windows Vim build because it does not provide a stable Windows Vim channel.
 Each job prints the actual editor version.
 
-This matrix supplies platform coverage once it runs on GitHub. It does not
-establish a minimum supported Vim or Neovim version. Add pinned older versions
-when the project's support policy is defined; running the suite against an
-older executable locally uses the same `--editor` argument. The test tooling's
-Python requirement does not add a runtime dependency to the plugin.
+The matrix also tests the compatibility baselines, Vim 8.2.1926 and Neovim
+0.5.0, on Linux. Running against an older executable locally uses the same
+`--editor` argument. Vim before 9.1.0783 needs 'isfname' to include backslash
+when assigning escaped commas to 'spellfile'; the custom-path fixture applies
+that editor workaround, while the runtime-path test verifies that the plugin
+handles it and restores 'isfname'. Windows warning assertions normalize path
+separators, and preservation tests compare the original bytes (including the
+fixture's native line endings). The test tooling's Python requirement does
+not add a runtime dependency to the plugin.
 
 ## Framework choices
 
