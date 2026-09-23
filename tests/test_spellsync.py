@@ -321,6 +321,24 @@ class SpellSyncTests(unittest.TestCase):
         """)
         self.assertTrue(Path(str(path) + ".spl").is_file())
 
+    def test_runtime_directories_with_literal_glob_characters(self):
+        for directory in ('extra[one]', 'extra{one,two}'):
+            with self.subTest(directory=directory):
+                path = self.wordlist(directory + '/spell/ssbase.utf-8.add')
+                self.vim(r"""
+                    let original_isfname = &isfname
+                    SpellSync
+                    call assert_true(filereadable(g:test_root . '/DIRECTORY/spell/ssbase.utf-8.add.spl'))
+                    call assert_equal(['', ''], spellbadword('spellsyncword'))
+                    call assert_equal(original_isfname, &isfname)
+                    call assert_notmatch('SpellSync:', execute('messages'))
+                """.replace('DIRECTORY', directory), before=r"""
+                    let &runtimepath .= ',' . escape(g:test_root . '/DIRECTORY', '[],{}')
+                    call TestSpelling()
+                    call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
+                """.replace('DIRECTORY', directory))
+                self.assertTrue(Path(str(path) + '.spl').is_file())
+
     def test_discovery_ignores_wildignore(self):
         path = self.wordlist()
         self.vim("""
@@ -351,6 +369,24 @@ class SpellSyncTests(unittest.TestCase):
             call assert_notmatch('SpellSync:', execute('messages'))
         """, before="set spellfile=")
         self.assertEqual([], list(directory.iterdir()))
+
+    def test_hidden_runtime_wordlists_remain_outside_discovery(self):
+        path = self.wordlist('runtime/spell/.hidden.add')
+        self.vim('SpellSync')
+        self.assertFalse(Path(str(path) + '.spl').exists())
+        self.assertFalse((path.parent / '.gitignore').exists())
+
+    def test_unreadable_runtime_directory_does_not_block_others(self):
+        source = self.wordlist()
+        good = self.wordlist('second-runtime/spell/ssbase.utf-8.add')
+        self.restrict_permissions(source.parent, 0o000, os.R_OK)
+        self.vim("""
+            SpellSync
+            " Neovim may reject this directory during the initial glob;
+            " Vim reaches readdir(). Either failure must leave others usable.
+            call assert_true(filereadable(g:test_root . '/second-runtime/spell/ssbase.utf-8.add.spl'))
+        """, before="let &runtimepath .= ',' . escape(g:test_root . '/second-runtime', ',')")
+        self.assertTrue(Path(str(good) + '.spl').is_file())
 
     def test_creates_git_rules_in_runtime_and_custom_directories(self):
         self.wordlist()
@@ -599,7 +635,7 @@ class SpellSyncTests(unittest.TestCase):
             call assert_false(filereadable(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
             " A subsequent ordinary invocation can still complete normally.
             SpellSync
-        """)
+        """, before="let &spellfile = g:test_root . '/runtime/spell/ssbase.utf-8.add'")
         self.assertTrue(Path(str(path) + ".spl").is_file())
 
     def test_wordlist_and_binary_symlinks_are_preserved(self):

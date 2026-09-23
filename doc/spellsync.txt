@@ -112,6 +112,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Discover literal directory names containing glob characters
+           and report unreadable spell directories without stopping the sync
     * FIX: Register startup syncing once and honor startup settings when
            plugin managers load SpellSync after VimEnter
     * FIX: Refresh comma-containing runtime paths on older Vim and make

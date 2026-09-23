@@ -37,7 +37,16 @@ function! s:syncSpellDirs()
   let l:dirs = globpath(&runtimepath, 'spell', 1, 1)
 
   for l:dir in l:dirs
-    let l:wordlists = globpath(escape(l:dir, ','), '*.add', 1, 1, 1)
+    try
+      " A discovered directory is a literal name, not another glob pattern.
+      " Keep the existing *.add policy (excluding dotfiles), including links.
+      let l:names = readdir(l:dir)
+      call filter(l:names, 'v:val !~# ''^\.'' && (has(''fname_case'') ? v:val =~# ''\.add$'' : v:val =~? ''\.add$'')')
+      let l:wordlists = map(l:names, 'l:dir . ''/'' . v:val')
+    catch /^Vim\%((\a\+)\)\=:E/
+      call s:warn(l:dir, 'could not read spell directory: ' . v:exception)
+      continue
+    endtry
     " System runtimes often contain only binaries, with no word lists to sync.
     if empty(l:wordlists)
       continue
@@ -157,10 +166,15 @@ endfunction
 function! s:setSpellOption(option, value) abort
   let l:isfname = &isfname
   try
-    " Vim before 9.1.0783 and Neovim before 0.11 validate the escape in '\,' as a filename
-    " character, although its option parser already understands the escape.
-    if a:option ==# 'spellfile' && (has('nvim') ? !has('nvim-0.11') : !has('patch-9.1.783'))
-      silent noautocmd set isfname+=92
+    " 'spellfile' validates filenames against 'isfname'. Literal runtime
+    " paths may contain other characters, and older editors also validate
+    " the backslash in '\,'. Admit only the characters needed for this load.
+    if a:option ==# 'spellfile'
+      for l:char in split(a:value, '\zs')
+        if l:char !~# '^\f$'
+          silent noautocmd let &isfname .= ',' . char2nr(l:char)
+        endif
+      endfor
     endif
     execute 'silent noautocmd let &l:' . a:option . ' = a:value'
   catch /^Vim\%((\a\+)\)\=:E/

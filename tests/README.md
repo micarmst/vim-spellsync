@@ -41,16 +41,18 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 56 tests cover:
+The 59 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
   invocation through both public entry points, repeated sourcing, and late
   loading with automatic syncing enabled or disabled.
 - Multiple runtime spell directories, multiple custom word lists, relative
-  paths, spaces and escaped commas in paths, and missing/empty configurations.
+  paths, spaces, escaped commas and literal glob characters in paths, and
+  missing/empty configurations.
 - Discovery independent of `'wildignore'`, including broken source symlinks,
-  and leaving runtime spell directories without word lists alone.
+  and leaving runtime spell directories without word lists alone. Hidden
+  runtime lists remain excluded; unreadable directories do not block others.
 - Missing binaries and stale binaries, including additions and removals that
   become visible to spell checking during the same editor session.
 - Already-current runtime and first custom dictionaries remaining unchanged
