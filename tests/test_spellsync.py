@@ -209,6 +209,44 @@ class SpellSyncTests(unittest.TestCase):
             call assert_equal(['', ''], spellbadword('spellsyncword'))
         """, before="let &spellfile = g:test_root . '/custom/words.utf-8.add'", startup=None)
 
+    def test_repeated_loading_registers_one_startup_hook(self):
+        self.wordlist()
+        self.vim(r"""
+            runtime plugin/spellsync.vim
+            let hooks = filter(split(execute('autocmd VimEnter'), "\n"), 'v:val =~# ''\%(call spellsync#Run()\|SpellSync\)\s*$''' )
+            call assert_equal(1, len(hooks))
+            call assert_equal(1, g:unrelated_startup)
+            call assert_true(filereadable(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
+        """, before="""
+            let g:unrelated_startup = 0
+            augroup TestUnrelatedStartup
+              autocmd VimEnter * let g:unrelated_startup += 1
+            augroup END
+            runtime plugin/spellsync.vim
+        """, startup=1)
+
+    def test_late_loading_syncs_once(self):
+        self.wordlist()
+        (self.runtime / 'plugin/spellsync.vim').rename(self.root / 'held-plugin.vim')
+        self.vim("""
+            execute 'source ' . fnameescape(g:test_root . '/held-plugin.vim')
+            let binary = g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'
+            call assert_true(filereadable(binary))
+            call delete(binary)
+            execute 'source ' . fnameescape(g:test_root . '/held-plugin.vim')
+            call assert_false(filereadable(binary), 'Repeated loading must not sync again')
+        """, startup=1)
+
+    def test_late_loading_respects_startup_opt_out(self):
+        self.wordlist()
+        (self.runtime / 'plugin/spellsync.vim').rename(self.root / 'held-plugin.vim')
+        self.vim("""
+            execute 'source ' . fnameescape(g:test_root . '/held-plugin.vim')
+            call assert_false(filereadable(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
+            SpellSync
+            call assert_true(filereadable(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
+        """)
+
     def test_public_autoload_function(self):
         self.wordlist()
         self.vim("""

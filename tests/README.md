@@ -41,11 +41,12 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 53 tests cover:
+The 56 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
-  invocation through both public entry points.
+  invocation through both public entry points, repeated sourcing, and late
+  loading with automatic syncing enabled or disabled.
 - Multiple runtime spell directories, multiple custom word lists, relative
   paths, spaces and escaped commas in paths, and missing/empty configurations.
 - Discovery independent of `'wildignore'`, including broken source symlinks,
@@ -116,7 +117,6 @@ must continue:
 
 | Case | Desired regression assertion |
 | --- | --- |
-| Repeated/late loading | Registration is idempotent and late loading follows the agreed automatic/manual policy. |
 | Timestamp equality/restores | A force-rebuild command or stronger detection handles content changes missed by modification times. |
 
 For each fix: add a test that fails on the existing implementation, make the

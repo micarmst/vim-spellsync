@@ -40,7 +40,13 @@ lists are also left alone.
 2. Usage                                              *SpellSyncUsage*
 
 The plugin runs automatically at startup by default. It can also be
-called with the command: >
+called with the command below. If first loaded after startup, it syncs
+immediately. Repeated loading does not register duplicate hooks or sync
+again. Set configuration options before loading the plugin; setting
+|g:spellsync_run_at_startup| to 0 disables both automatic cases.
+
+                                                        *:SpellSync*
+>
 
     :SpellSync
 
@@ -66,7 +72,9 @@ the original 'isfname' afterwards.
 
 Below are the options available and their default values.
 
-Run SpellSync automatically when Vim starts: >
+                                      *g:spellsync_run_at_startup*
+Run SpellSync automatically at startup, or immediately when first loaded
+later. Set to 0 to use manual syncing only: >
 
     let g:spellsync_run_at_startup = 1
 
@@ -104,6 +112,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Register startup syncing once and honor startup settings when
+           plugin managers load SpellSync after VimEnter
     * FIX: Refresh comma-containing runtime paths on older Vim and make
            warning and file-preservation tests portable to Windows
     * FIX: Compile readable word lists without requiring source write

@@ -24,6 +24,11 @@
 " OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 " SOFTWARE.
 
+if exists('g:loaded_spellsync')
+  finish
+endif
+let g:loaded_spellsync = 1
+
 command! SpellSync call spellsync#Run()
 
 " Options
@@ -39,7 +44,14 @@ if !exists('g:spellsync_enable_git_ignore')
   let g:spellsync_enable_git_ignore = 1
 endif
 
-" Run at startup
-if g:spellsync_run_at_startup
-  autocmd VimEnter * SpellSync 
+augroup SpellSync
+  autocmd!
+  if g:spellsync_run_at_startup && !v:vim_did_enter
+    autocmd VimEnter * call spellsync#Run()
+  endif
+augroup END
+
+" Plugin managers may first source this file after VimEnter has happened.
+if g:spellsync_run_at_startup && v:vim_did_enter
+  call spellsync#Run()
 endif

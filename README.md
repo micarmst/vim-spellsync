@@ -12,9 +12,21 @@ Using a plugin manager like [vim-plug](https://github.com/junegunn/vim-plug):
 Plug 'micarmst/vim-spellsync'
 ```
 
+With [lazy.nvim](https://lazy.folke.io/spec), configure globals in `init` and use eager loading for startup syncing:
+
+```lua
+{
+  'micarmst/vim-spellsync',
+  lazy = false,
+  init = function()
+    vim.g.spellsync_run_at_startup = 1
+  end,
+}
+```
+
 ## Usage
 
-The plugin runs automatically at startup by default. It can also be called with the `:SpellSync` command.
+The plugin runs automatically at startup by default. If first loaded after startup, it syncs immediately. Loading it again does not register duplicate hooks or run another sync. Set options before the plugin loads; `g:spellsync_run_at_startup = 0` disables either automatic run. You can always sync manually with `:SpellSync`.
 
 Read-only word lists are supported when their binary spell files can be created or updated. If a file cannot be read or written, SpellSync reports the path and reason and continues with the other dictionaries. Use `:messages` to review warnings, including Git configuration and spell-refresh failures. Missing word lists are skipped.
 
