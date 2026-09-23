@@ -131,6 +131,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * CHANGE: Collect and deduplicate paths before configuring directories,
+              rebuilding dictionaries, and refreshing spell checking
     * ADD: :SpellSync! and spellsync#Run(1) for explicit recovery from
            timestamp misses or damaged binaries
     * FIX: Activate new runtime dictionaries in other spell-enabled windows

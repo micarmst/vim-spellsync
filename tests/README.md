@@ -11,7 +11,9 @@ operations, and spell compiler in Vim or Neovim. That boundary contains the
 behaviour users depend on. They do not call private `s:` functions, mock
 `:mkspell`, or depend on the internal organisation of the plugin. If pure
 parsing or decision-making helpers are introduced later, smaller unit tests
-can supplement these tests.
+can supplement these tests. The duplicate-compilation regression counts the
+real compiler messages in its verbose log under the C locale, without
+replacing the compiler or depending on private function names.
 
 ## Running
 
@@ -41,12 +43,15 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 66 tests cover:
+The 70 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
   invocation through both public entry points, repeated sourcing, and late
   loading with automatic syncing enabled or disabled.
+- Duplicate absolute/relative paths, repeated runtime entries, and Windows
+  path spellings compiling once even during a force rebuild; one warning per
+  failed source or Git file; distinct symlink outputs remaining separate.
 - Multiple runtime spell directories, multiple custom word lists, relative
   paths, spaces, escaped commas and literal glob characters in paths, and
   missing/empty configurations.

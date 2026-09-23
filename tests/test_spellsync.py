@@ -263,6 +263,64 @@ class SpellSyncTests(unittest.TestCase):
         for path in paths:
             self.assertTrue(Path(str(path) + ".spl").is_file(), str(path))
 
+    def test_duplicate_source_paths_report_one_failure(self):
+        path = self.wordlist()
+        self.restrict_permissions(path, 0o000, os.R_OK)
+        self.vim(r"""
+            SpellSync
+            let warnings = filter(split(execute('messages'), "\n"), 'v:val =~# "^SpellSync: .*source is not readable"')
+            call assert_equal(1, len(warnings))
+        """, before="""
+            let &runtimepath .= ',' . escape(g:test_root . '/runtime', ',')
+            let &spellfile = g:test_root . '/runtime/spell/ssbase.utf-8.add,runtime/spell/ssbase.utf-8.add'
+        """)
+
+    def test_force_sync_compiles_duplicate_paths_once(self):
+        path = self.wordlist()
+        self.env['LC_ALL'] = 'C'
+        self.vim('SpellSync!', before="""
+            let &runtimepath .= ',' . escape(g:test_root . '/runtime', ',')
+            let &spellfile = g:test_root . '/runtime/spell/ssbase.utf-8.add,runtime/spell/ssbase.utf-8.add'
+            if has('win32')
+              let &spellfile .= ',' . toupper(g:test_root . '/runtime/spell/ssbase.utf-8.add')
+            endif
+        """)
+        # Observe the real compiler's verbose log, without replacing :mkspell
+        # or depending on the plugin's private function names.
+        log = (self.root / 'editor.log').read_text(encoding='utf-8', errors='replace')
+        self.assertEqual(1, log.count('Reading word file '), log)
+        self.assertTrue(Path(str(path) + '.spl').is_file())
+
+    def test_git_directory_failures_are_reported_once_per_file(self):
+        paths = [self.wordlist('custom/' + name + '.utf-8.add') for name in ('one', 'two')]
+        for path in paths:
+            self.compile(path)
+        self.restrict_permissions(paths[0].parent, 0o555, os.W_OK)
+        self.vim(r"""
+            SpellSync!
+            let warnings = filter(split(execute('messages'), "\n"), 'v:val =~# "^SpellSync: .*Git configuration directory is not writable"')
+            call assert_equal(2, len(warnings))
+            call TestWarning(g:test_root . '/custom/.gitignore', 'not writable')
+            call TestWarning(g:test_root . '/custom/.gitattributes', 'not writable')
+        """, before="""
+            let &spellfile = g:test_root . '/custom/one.utf-8.add,' . g:test_root . '/custom/two.utf-8.add,custom/one.utf-8.add'
+        """)
+
+    def test_source_symlink_aliases_keep_distinct_output_binaries(self):
+        source = self.wordlist('stored/source.words')
+        original = source.read_bytes()
+        links = [self.root / ('custom/' + name + '.utf-8.add') for name in ('one', 'two')]
+        links[0].parent.mkdir()
+        for link in links:
+            self.symlink(link, os.path.relpath(source, link.parent))
+        self.vim('SpellSync!', before="""
+            let &spellfile = g:test_root . '/custom/one.utf-8.add,' . g:test_root . '/custom/two.utf-8.add'
+        """)
+        for link in links:
+            self.assertTrue(link.is_symlink())
+            self.assertTrue(Path(str(link) + '.spl').is_file())
+        self.assertEqual(original, source.read_bytes())
+
     def test_multiple_custom_spellfiles(self):
         for name in ("one", "two"):
             self.wordlist("custom/" + name + ".utf-8.add", ["spellsync" + name])
