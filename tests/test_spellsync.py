@@ -762,6 +762,67 @@ class SpellSyncTests(unittest.TestCase):
             call assert_equal(['', ''], spellbadword('oldspellsyncword'))
         """)
 
+    def test_force_rebuild_recovers_equal_and_older_timestamps(self):
+        for command in ('SpellSync!', 'call spellsync#Run(1)'):
+            for source_time in (946684800, 946684790):
+                with self.subTest(command=command, source_time=source_time):
+                    paths = [self.wordlist(name, ['oldspellsyncword']) for name in (
+                        'runtime/spell/ssbase.utf-8.add', 'custom/words.utf-8.add',
+                    )]
+                    for path in paths:
+                        self.compile(path)
+                        path.write_text('newspellsyncword\n', encoding='utf-8')
+                        os.utime(path, (source_time, source_time))
+                        os.utime(str(path) + '.spl', (946684800, 946684800))
+                    originals = [path.read_bytes() for path in paths]
+                    self.vim("""
+                        SpellSync
+                        call assert_equal(['newspellsyncword', 'bad'], spellbadword('newspellsyncword'))
+                        call assert_equal(946684800, getftime(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
+                        FORCE
+                        call assert_equal(['', ''], spellbadword('newspellsyncword'))
+                        call assert_equal(['oldspellsyncword', 'bad'], spellbadword('oldspellsyncword'))
+                        call assert_equal(['', ''], spellbadword('ephemeralspellsyncword'))
+                        call assert_notmatch('SpellSync:', execute('messages'))
+                    """.replace('FORCE', command), before="""
+                        let &spellfile = g:test_root . '/custom/words.utf-8.add'
+                        call TestSpelling()
+                        silent spellgood! ephemeralspellsyncword
+                    """)
+                    for path, original in zip(paths, originals):
+                        self.assertEqual(original, path.read_bytes())
+                        self.assertGreater(Path(str(path) + '.spl').stat().st_mtime, 946684800)
+
+    def test_force_rebuild_recovers_corrupt_binary(self):
+        path = self.wordlist()
+        binary = Path(str(path) + '.spl')
+        binary.write_bytes(b'not a spell binary')
+        for file in (path, binary):
+            os.utime(file, (946684800, 946684800))
+        self.vim("""
+            SpellSync!
+            call TestSpelling()
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """)
+
+    def test_force_rebuild_reports_unwritable_binary_and_continues(self):
+        path = self.wordlist('runtime/spell/aa.utf-8.add')
+        self.compile(path)
+        binary = Path(str(path) + '.spl')
+        original = binary.read_bytes()
+        for file in (path, binary):
+            os.utime(file, (946684800, 946684800))
+        self.restrict_permissions(binary, 0o444, os.W_OK)
+        good = self.wordlist('runtime/spell/zz.utf-8.add')
+        self.vim("""
+            SpellSync!
+            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add.spl', 'not writable')
+            call assert_equal(946684800, getftime(g:test_root . '/runtime/spell/aa.utf-8.add.spl'))
+        """)
+        self.assertEqual(original, binary.read_bytes())
+        self.assertTrue(Path(str(good) + '.spl').is_file())
+
     def test_current_runtime_binary_is_not_rewritten(self):
         path = self.wordlist()
         self.compile(path)

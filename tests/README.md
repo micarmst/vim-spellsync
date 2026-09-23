@@ -41,7 +41,7 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 63 tests cover:
+The 66 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
@@ -55,6 +55,8 @@ The 63 tests cover:
   runtime lists remain excluded; unreadable directories do not block others.
 - Missing binaries and stale binaries, including additions and removals that
   become visible to spell checking during the same editor session.
+- Forced rebuilding through both public entry points after equal/older source
+  timestamps or a corrupt binary, with source preservation and write checks.
 - Already-current runtime and first custom dictionaries remaining unchanged
   on disk, including after repeated syncing.
 - Generated Git rules in runtime and custom directories, preservation of
@@ -113,16 +115,7 @@ Symlink tests are skipped when the system does not support or permit creating
 them. Named-pipe tests require POSIX support. These skips are reported by the
 test runner.
 
-## Existing defects and future tests
-
-A passing baseline does not mean every known defect has been fixed. The
-following cases should get a failing regression test as part of their fix;
-the suite intentionally does not assert that these undesirable behaviours
-must continue:
-
-| Case | Desired regression assertion |
-| --- | --- |
-| Timestamp equality/restores | A force-rebuild command or stronger detection handles content changes missed by modification times. |
+## Adding regression coverage
 
 For each fix: add a test that fails on the existing implementation, make the
 smallest change needed, and run the whole suite in both editors. Keep the new

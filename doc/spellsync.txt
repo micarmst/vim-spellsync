@@ -49,6 +49,20 @@ again. Set configuration options before loading the plugin; setting
 >
 
     :SpellSync
+<
+Rebuild missing binaries and those older than their sources.
+
+                                                       *:SpellSync!*
+    :SpellSync!
+
+Force rebuilding word lists in the same scope, regardless of timestamps.
+Use this after timestamp-preserving restores, changes within the same
+filesystem timestamp second, or to replace a damaged binary. Permissions
+and error handling still apply; source text is never modified.
+
+                                                   *spellsync#Run()*
+For scripts, call spellsync#Run() (or spellsync#Run(0)) for ordinary syncing,
+or spellsync#Run(1) to force rebuilding.
 
 Runtime word lists and the active buffer's 'spellfile' entries are synced.
 Custom sources configured only in other buffers are not compiled. New runtime
@@ -117,6 +131,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * ADD: :SpellSync! and spellsync#Run(1) for explicit recovery from
+           timestamp misses or damaged binaries
     * FIX: Activate new runtime dictionaries in other spell-enabled windows
            and tabs while preserving local options and editor state
     * FIX: Discover literal directory names containing glob characters

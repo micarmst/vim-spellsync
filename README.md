@@ -28,6 +28,8 @@ With [lazy.nvim](https://lazy.folke.io/spec), configure globals in `init` and us
 
 The plugin runs automatically at startup by default. If first loaded after startup, it syncs immediately. Loading it again does not register duplicate hooks or run another sync. Set options before the plugin loads; `g:spellsync_run_at_startup = 0` disables either automatic run. You can always sync manually with `:SpellSync`.
 
+Use `:SpellSync!` to rebuild every readable word list in the usual sync scope, regardless of timestamps. This recovers changes made within the same timestamp second, timestamp-preserving restores, or a damaged binary. Ordinary `:SpellSync` keeps its inexpensive timestamp check.
+
 Read-only word lists are supported when their binary spell files can be created or updated. If a file cannot be read or written, SpellSync reports the path and reason and continues with the other dictionaries. Use `:messages` to review warnings, including Git configuration and spell-refresh failures. Missing word lists are skipped.
 
 Vim before 9.1.0783 and Neovim before 0.11 require `set isfname+=92` before configuring a custom `'spellfile'` path containing an escaped comma. SpellSync handles this editor limitation automatically when refreshing dictionaries discovered through `'runtimepath'`.

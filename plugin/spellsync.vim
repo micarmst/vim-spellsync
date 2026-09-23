@@ -29,7 +29,7 @@ if exists('g:loaded_spellsync')
 endif
 let g:loaded_spellsync = 1
 
-command! SpellSync call spellsync#Run()
+command! -bang SpellSync call spellsync#Run(<bang>0)
 
 " Options
 if !exists('g:spellsync_run_at_startup')
