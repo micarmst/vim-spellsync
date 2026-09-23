@@ -88,8 +88,42 @@ function! s:gitIgnoreSpellFiles(dir)
 endfunction
 
 function! s:spellReload()
-  " Even after rebuilding the spell file, Vim will still highlight new words as
-  " mistakes until it is restarted. Misusing the spellundo command as below
-  " forces Vim to reload its spell check as it attempts to remove a fake word.
-  silent! spellundo U1BFTExTWU5D
+  " :mkspell reloads dictionaries already in use. New runtime additions must
+  " also enter the language cache: resetting an option alone does not rescan
+  " additions for a language that was already loaded.
+  let l:wordlists = []
+  for l:lang in split(&l:spelllang, ',')
+    " Explicit .spl paths do not use runtime additions; cjk is not a language.
+    if l:lang ==# 'cjk' || l:lang =~# '\.spl$'
+      continue
+    endif
+    let l:lang = substitute(l:lang, '_..$', '', '')
+    let l:encoding = &encoding ==# 'iso-8859-15' ? 'latin1' : &encoding
+    let l:pattern = 'spell/' . l:lang . '.'
+    " Match Vim's base-dictionary encoding, including its ASCII fallback.
+    if empty(globpath(&runtimepath, l:pattern . l:encoding . '.spl', 1))
+      let l:encoding = 'ascii'
+      if empty(globpath(&runtimepath, l:pattern . l:encoding . '.spl', 1))
+        continue
+      endif
+    endif
+    for l:file in globpath(&runtimepath, l:pattern . l:encoding . '.add.spl', 1, 1)
+      call add(l:wordlists, escape(fnamemodify(l:file, ':r'), '\,'))
+    endfor
+  endfor
+
+  let l:spellfile = &l:spellfile
+  let l:spell = &l:spell
+  try
+    " Load only additions for the current languages, then restore the user's
+    " exact setting. This also refreshes explicitly configured spell files.
+    if !empty(l:wordlists)
+      " Option changes only load dictionaries while spell checking is on.
+      silent! noautocmd setlocal spell
+      silent! noautocmd let &l:spellfile = join(l:wordlists, ',')
+    endif
+  finally
+    silent! noautocmd let &l:spellfile = l:spellfile
+    silent! noautocmd let &l:spell = l:spell
+  endtry
 endfunction

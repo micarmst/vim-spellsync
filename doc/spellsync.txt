@@ -79,6 +79,11 @@ Contributions are welcome, feel free to submit a pull request:
 ====================================================================
 7. Changelog                                      *SpellSyncChangelog*
 
+Unreleased
+    * FIX: Refresh spell checking without changing word lists or
+           recompiling an unchanged first custom dictionary
+    * FIX: Preserve an empty 'spellfile' option during refresh
+
 v1.0.0
     * ADD: Plugin attribution comment for generated files
         * Suggested by John Karahalis (openjck)

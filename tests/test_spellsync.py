@@ -111,7 +111,8 @@ class SpellSyncTests(unittest.TestCase):
               BEFORE
               runtime plugin/spellsync.vim
               augroup SpellSyncTests
-                autocmd VimEnter * call TestAfterStartup()
+                " Allow editor events as with an interactive :SpellSync call.
+                autocmd VimEnter * nested call TestAfterStartup()
               augroup END
             catch
               call assert_report(v:exception . ' at ' . v:throwpoint)
@@ -322,6 +323,194 @@ class SpellSyncTests(unittest.TestCase):
             call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
         """)
 
+    def test_current_first_custom_binary_is_not_rewritten(self):
+        path = self.wordlist("custom/words.utf-8.add")
+        self.compile(path)
+        binary = Path(str(path) + ".spl")
+        os.utime(path, (946684800, 946684800))
+        os.utime(binary, (946684810, 946684810))
+        original = binary.read_bytes(), binary.stat().st_mtime_ns
+        self.vim("""
+            SpellSync
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+        self.assertEqual(original, (binary.read_bytes(), binary.stat().st_mtime_ns))
+
+    def test_old_reload_marker_is_preserved_in_wordlist(self):
+        path = self.wordlist("custom/words.utf-8.add", ["U1BFTExTWU5D", "spellsyncword"])
+        original = path.read_bytes()
+        self.vim("""
+            SpellSync
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+        self.assertEqual(original, path.read_bytes())
+
+    def test_new_runtime_binary_refresh_preserves_empty_spellfile(self):
+        self.wordlist()
+        self.vim("""
+            SpellSync
+            call assert_equal('', &l:spellfile)
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+        """, before="""
+            setlocal spellfile=
+            call TestSpelling()
+            call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
+        """)
+
+    def test_new_runtime_additions_in_multiple_directories_become_active(self):
+        self.wordlist(words=["firstruntimeword"])
+        self.wordlist("second-runtime/spell/ssbase.utf-8.add", ["secondruntimeword"])
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('firstruntimeword'))
+            call assert_equal(['', ''], spellbadword('secondruntimeword'))
+            call assert_equal(['', ''], spellbadword('baselineword'))
+        """, before="""
+            let &runtimepath .= ',' . escape(g:test_root . '/second-runtime', ',')
+            setlocal spellfile=
+            call TestSpelling()
+            call assert_equal(['firstruntimeword', 'bad'], spellbadword('firstruntimeword'))
+            call assert_equal(['secondruntimeword', 'bad'], spellbadword('secondruntimeword'))
+        """)
+
+    def test_new_runtime_additions_respect_language_regions(self):
+        self.wordlist(words=["/regions=usgb", "usspellsyncword/1", "gbspellsyncword/2"])
+        self.wordlist("regional.words", ["/regions=usgb", "baselineword"])
+        self.vim("""
+            SpellSync
+            call assert_equal('ssbase_us', &l:spelllang)
+            call assert_equal(['', ''], spellbadword('usspellsyncword'))
+            call assert_equal(['gbspellsyncword', 'local'], spellbadword('gbspellsyncword'))
+            setlocal spelllang=ssbase_gb
+            call assert_equal(['', ''], spellbadword('gbspellsyncword'))
+            call assert_equal(['usspellsyncword', 'local'], spellbadword('usspellsyncword'))
+        """, before="""
+            execute 'silent mkspell! ' . fnameescape(g:test_root . '/runtime/spell/ssbase.utf-8.spl') . ' ' . fnameescape(g:test_root . '/regional.words')
+            setlocal spellfile= spelllang=ssbase_us spell
+            call assert_equal(['', ''], spellbadword('baselineword'))
+            call assert_equal(['usspellsyncword', 'bad'], spellbadword('usspellsyncword'))
+        """)
+
+    def test_new_runtime_additions_match_base_dictionary_encoding(self):
+        self.wordlist("base.words", ["baselineword"])
+        self.wordlist(words=["utfspellsyncword"])
+        self.wordlist("runtime/spell/ssbase.ascii.add", ["asciispellsyncword"])
+        for encoding, flag, accepted, rejected in (
+            ("utf-8", "", "utfspellsyncword", "asciispellsyncword"),
+            ("ascii", "-ascii ", "asciispellsyncword", "utfspellsyncword"),
+        ):
+            with self.subTest(encoding=encoding):
+                # Each invocation starts a fresh editor with only this base.
+                for binary in (self.runtime / "spell").glob("*.spl"):
+                    binary.unlink()
+                self.vim("""
+                    SpellSync
+                    call assert_equal(['', ''], spellbadword('ACCEPTED'))
+                    call assert_equal(['REJECTED', 'bad'], spellbadword('REJECTED'))
+                    call assert_equal(['', ''], spellbadword('baselineword'))
+                """.replace("ACCEPTED", accepted).replace("REJECTED", rejected), before="""
+                    execute 'silent mkspell! FLAG' . fnameescape(g:test_root . '/runtime/spell/ssbase.ENCODING.spl') . ' ' . fnameescape(g:test_root . '/base.words')
+                    setlocal spellfile= spelllang=ssbase spell
+                    call assert_equal(['ACCEPTED', 'bad'], spellbadword('ACCEPTED'))
+                """.replace("FLAG", flag).replace("ENCODING", encoding).replace("ACCEPTED", accepted))
+
+    def test_refresh_does_not_preload_an_unrelated_language(self):
+        self.wordlist()
+        self.wordlist("runtime/spell/otherbase.utf-8.add", ["otheradditionword"])
+        self.wordlist("other.words", ["otherbaselineword"])
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['otheradditionword', 'bad'], spellbadword('otheradditionword'))
+            setlocal spelllang=otherbase
+            call assert_equal(['', ''], spellbadword('otherbaselineword'))
+            call assert_equal(['', ''], spellbadword('otheradditionword'))
+        """, before="""
+            execute 'silent mkspell! ' . fnameescape(g:test_root . '/runtime/spell/otherbase.utf-8.spl') . ' ' . fnameescape(g:test_root . '/other.words')
+            setlocal spellfile=
+            call TestSpelling()
+        """)
+
+    def test_new_custom_binary_after_missing_first_entry_becomes_active(self):
+        self.wordlist("custom/words.utf-8.add")
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+        """, before="""
+            let &spellfile .= ',' . g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+            call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
+        """)
+
+    def test_refresh_preserves_options_without_firing_optionset(self):
+        self.wordlist("custom/words.utf-8.add")
+        self.wordlist(words=["runtimespellsyncword"])
+        self.vim("""
+            let options = [&l:spellfile, &g:spellfile, &l:spelllang, &g:spelllang, &l:spell]
+            let g:option_events = 0
+            augroup TestOptionEvents
+              autocmd OptionSet * let g:option_events += 1
+            augroup END
+            " Verify that the harness allows OptionSet to run before checking
+            " that the refresh itself emits no artificial option changes.
+            let &l:readonly = &l:readonly
+            call assert_equal(1, g:option_events)
+            let g:option_events = 0
+            SpellSync
+            call assert_equal(0, g:option_events)
+            call assert_equal(options, [&l:spellfile, &g:spellfile, &l:spelllang, &g:spelllang, &l:spell])
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['', ''], spellbadword('runtimespellsyncword'))
+        """, before="""
+            let &l:spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+
+    def test_rebuilt_dictionary_remains_live_in_other_windows(self):
+        path = self.wordlist("custom/words.utf-8.add", ["oldspellsyncword"])
+        self.compile(path)
+        path.write_text("newspellsyncword\n", encoding="utf-8")
+        os.utime(str(path) + ".spl", (946684800, 946684800))
+        os.utime(path, (946684810, 946684810))
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('newspellsyncword'))
+            wincmd p
+            call assert_equal(['', ''], spellbadword('newspellsyncword'))
+            call assert_equal(['oldspellsyncword', 'bad'], spellbadword('oldspellsyncword'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+            call assert_equal(['', ''], spellbadword('oldspellsyncword'))
+            new
+            let &l:spellfile = g:test_root . '/custom/words.utf-8.add'
+            setlocal spelllang=ssbase spell
+            call assert_equal(['', ''], spellbadword('oldspellsyncword'))
+        """)
+
+    def test_refresh_does_not_enable_spell_checking(self):
+        self.wordlist("custom/words.utf-8.add")
+        self.wordlist(words=["runtimespellsyncword"])
+        self.vim("""
+            SpellSync
+            call assert_false(&l:spell)
+            setlocal spell
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['', ''], spellbadword('runtimespellsyncword'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+            setlocal nospell
+        """)
+
     def test_wordlist_text_and_spelling_flags_are_preserved(self):
         path = self.wordlist("custom/words.utf-8.add", [
             "# personal words", "spellsyncgood", "spellsyncbad/!", "café",
@@ -338,10 +527,12 @@ class SpellSyncTests(unittest.TestCase):
 
     def test_in_memory_words_survive_sync(self):
         self.wordlist("custom/words.utf-8.add")
+        self.wordlist(words=["runtimespellsyncword"])
         self.vim("""
             SpellSync
             call assert_equal(['', ''], spellbadword('ephemeralspellsyncword'))
             call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['', ''], spellbadword('runtimespellsyncword'))
         """, before="""
             let &spellfile = g:test_root . '/custom/words.utf-8.add'
             call TestSpelling()

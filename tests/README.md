@@ -41,7 +41,7 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 22 baseline tests cover:
+The 33 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
@@ -50,17 +50,24 @@ The 22 baseline tests cover:
   paths, spaces in paths, and missing/empty configurations.
 - Missing binaries and stale binaries, including additions and removals that
   become visible to spell checking during the same editor session.
-- An already-current runtime dictionary remaining unchanged on disk.
+- Already-current runtime and first custom dictionaries remaining unchanged
+  on disk, including after repeated syncing.
 - Generated Git rules in runtime and custom directories, preservation of
   existing files (including empty ones), and independent Git option opt-outs.
 - Preservation of word-list text, banned-word flags, Unicode words, and
   temporary words added with `:spellgood!`.
+- Refreshing new dictionaries with an empty `'spellfile'` or a missing first
+  custom entry, while preserving the old reload marker as a real word.
+- Runtime additions across multiple directories, language regions, and ASCII
+  fallback, without preloading unrelated languages.
+- Preservation of local/global spell options and disabled spell checking,
+  without artificial `OptionSet` events during refresh.
+- Rebuilt dictionaries remaining active in other windows that already use them.
 
 The stale-custom-file test deliberately uses an entry after the first one in
-`'spellfile'`: this exercises normal rebuilding without the existing reload
-workaround accidentally doing the rebuilding for it. Similarly, the unchanged
-binary test covers a runtime dictionary; the first custom dictionary has a
-known redundant-rebuild defect, listed below.
+`'spellfile'` to ensure syncing processes more than just the first entry.
+The test runner allows nested events during assertions so option-event checks
+exercise the same hooks that can run during a manual `:SpellSync` invocation.
 
 ## Isolation and repeatability
 
@@ -90,7 +97,6 @@ must continue:
 
 | Case | Desired regression assertion |
 | --- | --- |
-| Reload workaround | An unchanged first custom dictionary is not recompiled, and `U1BFTExTWU5D` remains intact if it is a real entry. |
 | Unreadable existing Git file | Existing `.gitignore` and `.gitattributes` content is never replaced just because it cannot be read. |
 | Discovery filters | `'wildignore'` does not hide spell sources. |
 | Escaped paths | Runtime paths and `'spellfile'` entries containing escaped commas are handled correctly. |
