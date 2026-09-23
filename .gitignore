@@ -1,2 +1,3 @@
 .DS_STORE
 doc/tags
+__pycache__/

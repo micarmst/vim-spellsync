@@ -1,0 +1,131 @@
+# Regression tests
+
+The suite protects the public behaviour of `:SpellSync`, `spellsync#Run()`, and
+the three `g:spellsync_*` options before changing the released implementation.
+It uses Vim's built-in assertions and Python's standard-library `unittest`
+runner. No test framework, plugin manager, Python package, or downloaded
+dictionary is required.
+
+These are mostly integration tests: they execute the real plugin, filesystem
+operations, and spell compiler in Vim or Neovim. That boundary contains the
+behaviour users depend on. They do not call private `s:` functions, mock
+`:mkspell`, or depend on the internal organisation of the plugin. If pure
+parsing or decision-making helpers are introduced later, smaller unit tests
+can supplement these tests.
+
+## Running
+
+From the repository root, using Python 3.8 or newer:
+
+```sh
+python3 tests/test_spellsync.py --editor vim -v
+python3 tests/test_spellsync.py --editor nvim -v
+```
+
+On Windows, use `python` or `py -3` in place of `python3`. An absolute editor
+executable path is also accepted. The runner detects Vim versus Neovim from
+the executable's version output. A missing editor is an error, not a skipped
+test run.
+
+To run one test:
+
+```sh
+python3 tests/test_spellsync.py --editor nvim -v \
+  SpellSyncTests.test_new_custom_binary_becomes_active_without_restart
+```
+
+Assertion failures and unexpected Vimscript exceptions produce a nonzero exit
+status, with the editor's output and verbose log included in the failure report.
+Each editor invocation has a 20-second timeout. Temporary files are removed
+after each test, including failed tests.
+
+## Coverage
+
+The 22 baseline tests cover:
+
+- Command registration, default options, and preservation of explicit options.
+- Automatic syncing through the actual `VimEnter` event, startup opt-out, and
+  invocation through both public entry points.
+- Multiple runtime spell directories, multiple custom word lists, relative
+  paths, spaces in paths, and missing/empty configurations.
+- Missing binaries and stale binaries, including additions and removals that
+  become visible to spell checking during the same editor session.
+- An already-current runtime dictionary remaining unchanged on disk.
+- Generated Git rules in runtime and custom directories, preservation of
+  existing files (including empty ones), and independent Git option opt-outs.
+- Preservation of word-list text, banned-word flags, Unicode words, and
+  temporary words added with `:spellgood!`.
+
+The stale-custom-file test deliberately uses an entry after the first one in
+`'spellfile'`: this exercises normal rebuilding without the existing reload
+workaround accidentally doing the rebuilding for it. Similarly, the unchanged
+binary test covers a runtime dictionary; the first custom dictionary has a
+known redundant-rebuild defect, listed below.
+
+## Isolation and repeatability
+
+Every test gets a fresh temporary directory and a copy of `plugin/` and
+`autoload/`. Each editor invocation starts with `-u NONE`, no viminfo/ShaDa,
+no swap files, an empty package path, and a runtime path containing only test
+fixtures. Neovim's XDG directories and log file also point into the temporary
+directory. The working directory and the default test `'spellfile'` are there
+too. The developer's home directory is not changed.
+
+Tests that need spell recognition compile a tiny synthetic base dictionary.
+They never load the system spelling plugin or depend on English spell files
+being installed. Tests compare spell recognition and source-file content;
+they do not snapshot the editor-specific binary format.
+
+Timestamp tests use explicit, widely separated modification times set by
+Python's `os.utime()`. No sleeps or filesystem timing races are needed. Editor
+processes are separate so loaded dictionaries and script-local state do not
+leak between tests.
+
+## Existing defects and future tests
+
+A passing baseline does not mean every known defect has been fixed. The
+following cases should get a failing regression test as part of their fix;
+the suite intentionally does not assert that these undesirable behaviours
+must continue:
+
+| Case | Desired regression assertion |
+| --- | --- |
+| Reload workaround | An unchanged first custom dictionary is not recompiled, and `U1BFTExTWU5D` remains intact if it is a real entry. |
+| Unreadable existing Git file | Existing `.gitignore` and `.gitattributes` content is never replaced just because it cannot be read. |
+| Discovery filters | `'wildignore'` does not hide spell sources. |
+| Escaped paths | Runtime paths and `'spellfile'` entries containing escaped commas are handled correctly. |
+| Permissions | A readable source with a writable destination can be compiled; real failures are diagnosable. |
+| Repeated/late loading | Registration is idempotent and late loading follows the agreed automatic/manual policy. |
+| Timestamp equality/restores | A force-rebuild command or stronger detection handles content changes missed by modification times. |
+
+For each fix: add a test that fails on the existing implementation, make the
+smallest change needed, and run the whole suite in both editors. Keep the new
+test as a normal passing test. Assertions for permissions should account for
+Windows permission semantics and privileged Unix users.
+
+Changes to which buffers are scanned, the Git merge policy, automatic event
+selection, or public defaults need an explicit behaviour decision before
+writing their expected results. The current suite does not promise a particular
+private implementation or broaden the plugin's scope.
+
+## CI and compatibility
+
+The GitHub Actions workflow runs both editors on Linux, macOS, and Windows.
+It requests `stable` from `rhysd/action-setup-vim`; that action uses a current
+Windows Vim build because it does not provide a stable Windows Vim channel.
+Each job prints the actual editor version.
+
+This matrix supplies platform coverage once it runs on GitHub. It does not
+establish a minimum supported Vim or Neovim version. Add pinned older versions
+when the project's support policy is defined; running the suite against an
+older executable locally uses the same `--editor` argument. The test tooling's
+Python requirement does not add a runtime dependency to the plugin.
+
+## Framework choices
+
+[Vim's native assertions](https://vimhelp.org/testing.txt.html#assert-functions-details)
+are sufficient for this suite. [Vader](https://github.com/junegunn/vader.vim)
+provides a convenient format for buffer contents and keystroke-driven tests;
+[Themis](https://github.com/thinca/vim-themis) provides a fuller Vimscript test
+framework. Either would be reasonable if the testing needs grow. The current
+choice keeps the tests runnable with an editor and standard Python tooling.

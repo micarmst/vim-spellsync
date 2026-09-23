@@ -39,6 +39,10 @@ The plugin iterates through any spell folders in the Vim runtime and/or any spel
 
 It also tries to make keeping word lists in source control easier to manage. First it creates a `.gitignore` file if one does not exist in the spell folder, this excludes binary `*.spl` and `*.sug` files from being commited. Second, it creates a `.gitattributes` file if one does not already exist and sets Git to use its union merge driver for the spell folder. This prevents merge conflicts if word lists are being modified from multiple locations.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and testing instructions.
+
 ## References
 
 * [Sato Katsura explains how to generate spl files](https://vi.stackexchange.com/a/5052/19028)
