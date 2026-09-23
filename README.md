@@ -14,6 +14,8 @@ Plug 'micarmst/vim-spellsync'
 
 The plugin runs automatically at startup by default. It can also be called with the `:SpellSync` command.
 
+Read-only word lists are supported when their binary spell files can be created or updated. If a file cannot be read or written, SpellSync reports the path and reason and continues with the other dictionaries. Use `:messages` to review warnings, including Git configuration and spell-refresh failures. Missing word lists are skipped.
+
 ## Config
 
 Below are the options available and their default values:
@@ -40,6 +42,7 @@ The plugin iterates through any spell folders in the Vim runtime and/or any spel
 It also tries to make keeping word lists in source control easier to manage. First it creates a `.gitignore` file if one does not exist in the spell folder, this excludes binary `*.spl` and `*.sug` files from being commited. Second, it creates a `.gitattributes` file if one does not already exist and sets Git to use its union merge driver for the spell folder. This prevents merge conflicts if word lists are being modified from multiple locations.
 
 Existing Git configuration is left untouched, including unreadable files and symbolic links.
+Runtime spell directories without word lists are also left alone.
 
 ## Contributing
 

@@ -33,21 +33,34 @@ function! spellsync#Run()
 endfunction
 
 function! s:syncSpellDirs()
-  let l:dirs = split(globpath(&runtimepath, 'spell'), '\n')
+  " Do not let completion filters hide dictionaries or split names at newlines.
+  let l:dirs = globpath(&runtimepath, 'spell', 1, 1)
 
   for l:dir in l:dirs
+    let l:wordlists = globpath(escape(l:dir, ','), '*.add', 1, 1, 1)
+    " System runtimes often contain only binaries, with no word lists to sync.
+    if empty(l:wordlists)
+      continue
+    endif
     call s:gitSetupUnionMerge(l:dir)
     call s:gitIgnoreSpellFiles(l:dir)
-    let l:wordlists = split(globpath(l:dir, '*.add'), '\n')
     for l:wordlist in l:wordlists
       call s:buildSpellFile(l:wordlist)
     endfor
   endfor
 endfunction
 
+function! s:spellFiles() abort
+  " Match option-list escaping: only an unescaped comma separates paths.
+  let l:files = []
+  for l:file in split(&spellfile, '\\\@<!,')
+    call add(l:files, substitute(l:file, '\\,', ',', 'g'))
+  endfor
+  return l:files
+endfunction
+
 function! s:syncSpellFiles()
-  let l:customSpellFiles = split(&spellfile, ',')
-  for l:spellFile in l:customSpellFiles
+  for l:spellFile in s:spellFiles()
     let l:dir = fnamemodify(l:spellFile,':h')
     call s:gitSetupUnionMerge(l:dir)
     call s:gitIgnoreSpellFiles(l:dir)
@@ -55,41 +68,120 @@ function! s:syncSpellFiles()
   endfor
 endfunction
 
-function! s:buildSpellFile(wordlist)
-  " Check user has write access to this location
-  if !filewritable(a:wordlist)
-    return
-  endif
-
+function! s:buildSpellFile(wordlist) abort
   let l:spell_file = a:wordlist . '.spl'
+  try
+    " An unused 'spellfile' entry need not exist yet.
+    if getftype(a:wordlist) ==# ''
+      return
+    endif
+    " Follow ordinary file symlinks, but never read directories or devices.
+    if getftype(resolve(a:wordlist)) !=# 'file'
+      call s:warn(a:wordlist, 'source is not a regular file')
+      return
+    endif
+    if !filereadable(a:wordlist)
+      call s:warn(a:wordlist, 'source is not readable')
+      return
+    endif
 
-  " Call mkspell if the spell file is out of date
-  if getftime(a:wordlist) > getftime(l:spell_file)
-    silent! exec 'mkspell! ' . fnameescape(a:wordlist)
-  endif
+    let l:output_exists = getftype(l:spell_file) !=# ''
+    if l:output_exists && getftype(resolve(l:spell_file)) !=# 'file'
+      call s:warn(l:spell_file, 'destination is not a regular file')
+      return
+    endif
+    if l:output_exists && getftime(a:wordlist) <= getftime(l:spell_file)
+      return
+    endif
+
+    " Updating a file needs write access to the file; creating one needs
+    " write access to its directory. Neither requires a writable source.
+    if l:output_exists
+      if filewritable(l:spell_file) != 1
+        call s:warn(l:spell_file, 'destination is not writable')
+        return
+      endif
+    elseif filewritable(fnamemodify(l:spell_file, ':h')) != 2
+      call s:warn(l:spell_file, 'destination directory is not writable')
+      return
+    endif
+
+    " Checks cannot guarantee a successful write (ACLs, races, disk errors).
+    " Suppress compiler progress, but catch and report actual failures.
+    silent execute 'mkspell! ' . fnameescape(a:wordlist)
+  catch /^Vim\%((\a\+)\)\=:E/
+    call s:warn(a:wordlist, 'rebuild failed: ' . v:exception)
+  endtry
 endfunction
 
 function! s:gitSetupUnionMerge(dir)
   if g:spellsync_enable_git_union_merge
-    let l:gitattributes = a:dir . '/.gitattributes'
-    " Preserve all existing entries, including unreadable files and symlinks.
-    if getftype(l:gitattributes) ==# ''
-      silent! call writefile([s:gitGenComment, '*.add merge=union'], l:gitattributes)
-    endif
+    call s:createGitFile(a:dir . '/.gitattributes', ['*.add merge=union'])
   endif
 endfunction
 
 function! s:gitIgnoreSpellFiles(dir)
   if g:spellsync_enable_git_ignore
-    let l:gitignore = a:dir . '/.gitignore'
-    " Preserve all existing entries, including unreadable files and symlinks.
-    if getftype(l:gitignore) ==# ''
-      silent! call writefile([s:gitGenComment, '*.spl', '*.sug'], l:gitignore)
-    endif
+    call s:createGitFile(a:dir . '/.gitignore', ['*.spl', '*.sug'])
   endif
 endfunction
 
+function! s:createGitFile(path, rules) abort
+  " Preserve all existing entries, including unreadable files and symlinks.
+  " Missing directories for unused 'spellfile' entries are also left alone.
+  if getftype(a:path) !=# '' || !isdirectory(fnamemodify(a:path, ':h'))
+    return
+  endif
+  if filewritable(fnamemodify(a:path, ':h')) != 2
+    call s:warn(a:path, 'Git configuration directory is not writable')
+    return
+  endif
+  try
+    if writefile([s:gitGenComment] + a:rules, a:path) != 0
+      call s:warn(a:path, 'could not write Git configuration')
+    endif
+  catch /^Vim\%((\a\+)\)\=:E/
+    call s:warn(a:path, 'could not write Git configuration: ' . v:exception)
+  endtry
+endfunction
+
+function! s:warn(path, message) abort
+  echohl WarningMsg
+  try
+    echomsg 'SpellSync: ' . string(a:path) . ': ' . a:message
+  finally
+    echohl None
+  endtry
+endfunction
+
+function! s:setSpellOption(option, value) abort
+  try
+    execute 'silent noautocmd let &l:' . a:option . ' = a:value'
+  catch /^Vim\%((\a\+)\)\=:E/
+    call s:warn(a:option, 'could not refresh spell checking: ' . v:exception)
+  endtry
+endfunction
+
+function! s:canLoadSpellFile(path) abort
+  try
+    if getftype(a:path) ==# '' || getftype(resolve(a:path)) ==# 'file'
+      return 1
+    endif
+    call s:warn(a:path, 'refresh deferred: destination is not a regular file')
+  catch /^Vim\%((\a\+)\)\=:E/
+    call s:warn(a:path, 'refresh deferred: ' . v:exception)
+  endtry
+  return 0
+endfunction
+
 function! s:spellReload()
+  " Resetting options makes the editor open binaries itself. Do not let it
+  " reopen a rejected device or FIFO; other dictionaries have still synced.
+  for l:file in s:spellFiles()
+    if !s:canLoadSpellFile(l:file . '.spl')
+      return
+    endif
+  endfor
   " :mkspell reloads dictionaries already in use. New runtime additions must
   " also enter the language cache: resetting an option alone does not rescan
   " additions for a language that was already loaded.
@@ -110,6 +202,9 @@ function! s:spellReload()
       endif
     endif
     for l:file in globpath(&runtimepath, l:pattern . l:encoding . '.add.spl', 1, 1)
+      if !s:canLoadSpellFile(l:file)
+        return
+      endif
       call add(l:wordlists, escape(fnamemodify(l:file, ':r'), '\,'))
     endfor
   endfor
@@ -121,11 +216,11 @@ function! s:spellReload()
     " exact setting. This also refreshes explicitly configured spell files.
     if !empty(l:wordlists)
       " Option changes only load dictionaries while spell checking is on.
-      silent! noautocmd setlocal spell
-      silent! noautocmd let &l:spellfile = join(l:wordlists, ',')
+      call s:setSpellOption('spell', 1)
+      call s:setSpellOption('spellfile', join(l:wordlists, ','))
     endif
   finally
-    silent! noautocmd let &l:spellfile = l:spellfile
-    silent! noautocmd let &l:spell = l:spell
+    call s:setSpellOption('spellfile', l:spellfile)
+    call s:setSpellOption('spell', l:spell)
   endtry
 endfunction

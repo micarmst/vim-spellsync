@@ -30,7 +30,8 @@ Vim's spell directories to exclude binary spell files and uses its
 union merge driver to avoid conflicts.
 
 Existing Git configuration is left untouched, including unreadable
-files and symbolic links.
+files and symbolic links. Runtime spell directories without word
+lists are also left alone.
 
 ====================================================================
 2. Usage                                              *SpellSyncUsage*
@@ -39,6 +40,18 @@ The plugin runs automatically at startup by default. It can also be
 called with the command: >
 
     :SpellSync
+
+Read-only word lists can be compiled if the binary spell file can
+be created or updated. Missing word lists are skipped.
+
+If a source cannot be read or its binary cannot be written, SpellSync
+reports the path and reason, then continues with other dictionaries.
+Git configuration write failures and spell-refresh errors are also
+reported. Use |:messages| to review warnings after startup or a sync.
+
+If a binary path points to a directory or other non-file entry, the
+final spell refresh is deferred until that path is fixed. Other
+dictionaries are still rebuilt.
 
 ====================================================================
 3. Config                                            *SpellSyncConfig*
@@ -83,6 +96,12 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Compile readable word lists without requiring source write
+           access; check existing binary or destination directory access
+    * FIX: Report file and refresh failures while continuing the sync
+    * FIX: Handle escaped commas and ignore completion filters when
+           discovering word lists
+    * CHANGE: Leave runtime spell directories without word lists alone
     * FIX: Preserve existing Git configuration entries, including
            unreadable files and dangling symbolic links
     * FIX: Refresh spell checking without changing word lists or

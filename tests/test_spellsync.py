@@ -57,6 +57,25 @@ class SpellSyncTests(unittest.TestCase):
         path.write_text("\n".join(words or ["spellsyncword"]) + "\n", encoding="utf-8")
         return path
 
+    def restrict_permissions(self, path, mode, denied_access):
+        if os.name != "posix":
+            self.skipTest("Requires POSIX file permissions")
+        original = path.stat().st_mode & 0o777
+        self.addCleanup(path.chmod, original)
+        path.chmod(mode)
+        if os.access(path, denied_access):
+            self.skipTest("Current user bypasses the requested permission restriction")
+
+    def symlink(self, path, target):
+        try:
+            path.symlink_to(target)
+        except NotImplementedError:
+            self.skipTest("Symbolic links are unavailable")
+        except OSError as error:
+            if error.errno not in (errno.EPERM, errno.EACCES, errno.ENOTSUP):
+                raise
+            self.skipTest("Cannot create symbolic links: " + str(error))
+
     def vim(self, after, before="", startup=0, options=None):
         """Set up before plugin loading; make assertions after real VimEnter."""
         settings = dict(options or {})
@@ -95,6 +114,13 @@ class SpellSyncTests(unittest.TestCase):
               execute 'silent mkspell! ' . fnameescape(g:test_root . '/runtime/spell/ssbase.utf-8.spl') . ' ' . fnameescape(g:test_root . '/base.words')
               setlocal spelllang=ssbase spell
               call assert_equal(['', ''], spellbadword('baselineword'))
+            endfunction
+
+            function! TestWarning(path, reason) abort
+              let warnings = split(execute('messages'), "\\n")
+              call filter(warnings, 'stridx(v:val, "SpellSync: ") == 0')
+              call filter(warnings, 'stridx(v:val, a:path) >= 0 && stridx(v:val, a:reason) >= 0')
+              call assert_false(empty(warnings), 'Missing warning for ' . a:path . ': ' . a:reason)
             endfunction
 
             function! TestAfterStartup() abort
@@ -223,13 +249,60 @@ class SpellSyncTests(unittest.TestCase):
             call assert_equal(['', ''], spellbadword('spellsyncword'))
         """, before="let &spellfile = 'custom/words.utf-8.add'")
 
+    def test_custom_path_with_escaped_comma(self):
+        path = self.wordlist("custom, words/words.utf-8.add")
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="""
+            let &spellfile = escape(g:test_root . '/custom, words/words.utf-8.add', ',')
+            call TestSpelling()
+        """)
+        self.assertTrue(Path(str(path) + ".spl").is_file())
+
+    def test_runtime_path_with_escaped_comma(self):
+        path = self.wordlist("extra, runtime/spell/ssbase.utf-8.add")
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="""
+            let &runtimepath .= ',' . escape(g:test_root . '/extra, runtime', ',')
+            call TestSpelling()
+        """)
+        self.assertTrue(Path(str(path) + ".spl").is_file())
+
+    def test_discovery_ignores_wildignore(self):
+        path = self.wordlist()
+        self.vim("""
+            set wildignore=spell,*.add,*.spl
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal('spell,*.add,*.spl', &wildignore)
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="call TestSpelling()")
+        self.assertTrue(Path(str(path) + ".spl").is_file())
+
     def test_missing_custom_wordlist_is_not_created(self):
-        self.vim("SpellSync", before="let &spellfile = g:test_root . '/missing/words.utf-8.add'")
+        self.vim("""
+            SpellSync
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="let &spellfile = g:test_root . '/missing/words.utf-8.add'")
         self.assertFalse((self.root / "missing").exists())
 
     def test_empty_configuration(self):
         self.vim("SpellSync", before="set spellfile=")
         self.assertFalse((self.runtime / "spell").exists())
+
+    def test_empty_runtime_spell_directory_is_left_alone(self):
+        directory = self.runtime / "spell"
+        directory.mkdir()
+        self.vim("""
+            SpellSync
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="set spellfile=")
+        self.assertEqual([], list(directory.iterdir()))
 
     def test_creates_git_rules_in_runtime_and_custom_directories(self):
         self.wordlist()
@@ -303,14 +376,7 @@ class SpellSyncTests(unittest.TestCase):
                 target = directory / ("saved" + name)
                 if content is not None:
                     target.write_bytes(content)
-                try:
-                    path.symlink_to(target.name)
-                except NotImplementedError:
-                    self.skipTest("Symbolic links are unavailable")
-                except OSError as error:
-                    if error.errno not in (errno.EPERM, errno.EACCES, errno.ENOTSUP):
-                        raise
-                    self.skipTest("Cannot create symbolic links: " + str(error))
+                self.symlink(path, target.name)
                 originals[path] = target, content
         self.vim("SpellSync", before="let &spellfile = g:test_root . '/custom/words.utf-8.add'")
         for path, (target, content) in originals.items():
@@ -349,6 +415,229 @@ class SpellSyncTests(unittest.TestCase):
         self.vim("SpellSync", options={"spellsync_enable_git_union_merge": 0})
         self.assertTrue((self.runtime / "spell/.gitignore").exists())
         self.assertFalse((self.runtime / "spell/.gitattributes").exists())
+
+    def test_readonly_sources_build_missing_and_stale_binaries(self):
+        runtime = self.wordlist()
+        custom = self.wordlist("custom/words.utf-8.add", ["oldspellsyncword"])
+        self.compile(custom)
+        custom.write_text("newspellsyncword\n", encoding="utf-8")
+        os.utime(str(custom) + ".spl", (946684800, 946684800))
+        os.utime(custom, (946684810, 946684810))
+        for path in (runtime, custom):
+            self.restrict_permissions(path, 0o400, os.W_OK)
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['', ''], spellbadword('newspellsyncword'))
+            call assert_equal(['oldspellsyncword', 'bad'], spellbadword('oldspellsyncword'))
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+
+    def test_unreadable_source_is_reported_and_other_dictionaries_continue(self):
+        path = self.wordlist("runtime/spell/aa.utf-8.add")
+        good = self.wordlist("runtime/spell/zz.utf-8.add")
+        self.restrict_permissions(path, 0o000, os.R_OK)
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add', 'not readable')
+        """)
+        self.assertFalse(Path(str(path) + ".spl").exists())
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    def test_missing_binary_in_unwritable_directory_is_reported(self):
+        path = self.wordlist("custom/words.utf-8.add")
+        good = self.wordlist("later/words.utf-8.add")
+        self.restrict_permissions(path.parent, 0o500, os.W_OK)
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/custom/words.utf-8.add.spl', 'not writable')
+        """, before="let &spellfile = g:test_root . '/custom/words.utf-8.add,' . g:test_root . '/later/words.utf-8.add'")
+        self.assertFalse(Path(str(path) + ".spl").exists())
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    def test_unwritable_existing_binary_is_reported_and_preserved(self):
+        path = self.wordlist("custom/words.utf-8.add", ["oldspellsyncword"])
+        self.compile(path)
+        binary = Path(str(path) + ".spl")
+        path.write_text("newspellsyncword\n", encoding="utf-8")
+        os.utime(binary, (946684800, 946684800))
+        os.utime(path, (946684810, 946684810))
+        original = binary.read_bytes(), binary.stat().st_mtime_ns
+        self.restrict_permissions(binary, 0o400, os.W_OK)
+        good = self.wordlist("later/words.utf-8.add")
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/custom/words.utf-8.add.spl', 'not writable')
+        """, before="let &spellfile = g:test_root . '/custom/words.utf-8.add,' . g:test_root . '/later/words.utf-8.add'")
+        self.assertEqual(original, (binary.read_bytes(), binary.stat().st_mtime_ns))
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    def test_git_write_failures_do_not_block_writable_binary_in_readonly_directory(self):
+        path = self.wordlist("custom/words.utf-8.add", ["oldspellsyncword"])
+        self.compile(path)
+        path.write_text("newspellsyncword\n", encoding="utf-8")
+        os.utime(str(path) + ".spl", (946684800, 946684800))
+        os.utime(path, (946684810, 946684810))
+        self.restrict_permissions(path, 0o400, os.W_OK)
+        self.restrict_permissions(path.parent, 0o500, os.W_OK)
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/custom/.gitignore', 'not writable')
+            call TestWarning(g:test_root . '/custom/.gitattributes', 'not writable')
+            call assert_equal(['', ''], spellbadword('newspellsyncword'))
+            call assert_equal(['oldspellsyncword', 'bad'], spellbadword('oldspellsyncword'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+        self.assertFalse((path.parent / ".gitignore").exists())
+        self.assertFalse((path.parent / ".gitattributes").exists())
+
+    def test_current_readonly_binary_does_not_report_a_write_failure(self):
+        path = self.wordlist()
+        self.compile(path)
+        binary = Path(str(path) + ".spl")
+        os.utime(path, (946684800, 946684800))
+        os.utime(binary, (946684810, 946684810))
+        original = binary.read_bytes(), binary.stat().st_mtime_ns
+        self.restrict_permissions(binary, 0o400, os.W_OK)
+        self.vim("""
+            SpellSync
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """)
+        self.assertEqual(original, (binary.read_bytes(), binary.stat().st_mtime_ns))
+
+    def test_non_file_sources_and_destinations_are_reported(self):
+        source = self.root / "runtime/spell/aa.utf-8.add"
+        source.mkdir(parents=True)
+        path = self.wordlist("runtime/spell/bb.utf-8.add")
+        binary = Path(str(path) + ".spl")
+        binary.mkdir()
+        sentinel = binary / "keep.txt"
+        sentinel.write_bytes(b"user content\n")
+        good = self.wordlist("runtime/spell/zz.utf-8.add")
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add', 'not a regular file')
+            call TestWarning(g:test_root . '/runtime/spell/bb.utf-8.add.spl', 'not a regular file')
+        """)
+        self.assertTrue(source.is_dir())
+        self.assertEqual(b"user content\n", sentinel.read_bytes())
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    def test_compiler_errors_are_reported_and_later_dictionaries_continue(self):
+        bad = self.wordlist("runtime/spell/aa_bad.utf-8.add")
+        good = self.wordlist("runtime/spell/zz.utf-8.add")
+        custom = self.wordlist("custom/words.utf-8.add")
+        self.vim("""
+            call TestWarning(g:test_root . '/runtime/spell/aa_bad.utf-8.add', 'E751:')
+        """, before="let &spellfile = g:test_root . '/custom/words.utf-8.add'", startup=1)
+        self.assertFalse(Path(str(bad) + ".spl").exists())
+        for path in (good, custom):
+            self.assertTrue(Path(str(path) + ".spl").is_file())
+
+    def test_write_time_errors_are_caught_and_reported(self):
+        path = self.wordlist()
+        self.vim("""
+            " The sandbox denies writes even though permission checks pass.
+            runtime autoload/spellsync.vim
+            sandbox call spellsync#Run()
+            call TestWarning(g:test_root . '/runtime/spell/.gitignore', 'E48:')
+            call TestWarning(g:test_root . '/runtime/spell/.gitattributes', 'E48:')
+            call TestWarning(g:test_root . '/runtime/spell/ssbase.utf-8.add', 'E48:')
+            call assert_false(filereadable(g:test_root . '/runtime/spell/ssbase.utf-8.add.spl'))
+            " A subsequent ordinary invocation can still complete normally.
+            SpellSync
+        """)
+        self.assertTrue(Path(str(path) + ".spl").is_file())
+
+    def test_wordlist_and_binary_symlinks_are_preserved(self):
+        source = self.wordlist("stored/words.utf-8.add", ["oldspellsyncword"])
+        self.compile(source)
+        binary = Path(str(source) + ".spl")
+        source.write_text("newspellsyncword\n", encoding="utf-8")
+        os.utime(binary, (946684800, 946684800))
+        os.utime(source, (946684810, 946684810))
+        link = self.root / "custom/words.utf-8.add"
+        link.parent.mkdir()
+        output = Path(str(link) + ".spl")
+        self.symlink(link, os.path.relpath(source, link.parent))
+        self.symlink(output, os.path.relpath(binary, output.parent))
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('newspellsyncword'))
+            call assert_equal(['oldspellsyncword', 'bad'], spellbadword('oldspellsyncword'))
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="""
+            let &spellfile = g:test_root . '/custom/words.utf-8.add'
+            call TestSpelling()
+        """)
+        self.assertTrue(link.is_symlink())
+        self.assertTrue(output.is_symlink())
+        self.assertEqual(b"newspellsyncword\n", source.read_bytes())
+
+    def test_dangling_wordlist_symlinks_are_reported(self):
+        link = self.root / "runtime/spell/aa.utf-8.add"
+        good = self.wordlist("runtime/spell/zz.utf-8.add")
+        self.symlink(link, "missing.words")
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add', 'not a regular file')
+        """)
+        self.assertTrue(link.is_symlink())
+        self.assertFalse((link.parent / "missing.words").exists())
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "Requires POSIX named pipes")
+    def test_named_pipes_are_rejected_without_blocking(self):
+        source = self.root / "custom/aa.utf-8.add"
+        regular = self.wordlist("custom/bb.utf-8.add")
+        output = Path(str(regular) + ".spl")
+        os.mkfifo(source)
+        os.mkfifo(output)
+        good = self.wordlist("custom/zz.utf-8.add")
+        self.vim("""
+            SpellSync
+            call TestWarning(g:test_root . '/custom/aa.utf-8.add', 'not a regular file')
+            call TestWarning(g:test_root . '/custom/bb.utf-8.add.spl', 'not a regular file')
+        """, before="let &spellfile = join(map(['aa', 'bb', 'zz'], \"g:test_root . '/custom/' . v:val . '.utf-8.add'\"), ',')")
+        self.assertTrue(source.is_fifo())
+        self.assertTrue(output.is_fifo())
+        self.assertTrue(Path(str(good) + ".spl").is_file())
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "Requires POSIX named pipes")
+    def test_refresh_does_not_open_named_pipe_outputs(self):
+        for name, spellfile in (
+            ("custom/words.utf-8.add", "g:test_root . '/custom/words.utf-8.add'"),
+            ("runtime/spell/ssbase.utf-8.add", "''"),
+        ):
+            with self.subTest(wordlist=name):
+                path = self.wordlist(name)
+                binary = Path(str(path) + ".spl")
+                pending = self.root / "pending-fifo"
+                os.mkfifo(pending)
+                good = self.wordlist("later/words.utf-8.add")
+                output = vim_string(binary.as_posix())
+                self.vim("""
+                    " Introduce a bad output after spell checking is active.
+                    call assert_equal(0, rename(g:test_root . '/pending-fifo', OUTPUT))
+                    SpellSync
+                    call TestWarning(OUTPUT, 'not a regular file')
+                    call assert_equal('fifo', getftype(OUTPUT))
+                    call assert_true(filereadable(g:test_root . '/later/words.utf-8.add.spl'))
+                    call assert_equal(0, delete(OUTPUT))
+                    SpellSync
+                    call assert_equal(['', ''], spellbadword('spellsyncword'))
+                """.replace("OUTPUT", output), before="""
+                    let &spellfile = SPELLFILE
+                    let &spellfile .= (empty(&spellfile) ? '' : ',') . g:test_root . '/later/words.utf-8.add'
+                    call TestSpelling()
+                """.replace("SPELLFILE", spellfile))
+                for created in (path, binary, good, Path(str(good) + ".spl")):
+                    created.unlink()
 
     def test_stale_runtime_binary_is_rebuilt_and_reloaded(self):
         path = self.wordlist(words=["oldspellsyncword"])

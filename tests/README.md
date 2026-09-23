@@ -41,13 +41,15 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 36 tests cover:
+The 53 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
   invocation through both public entry points.
 - Multiple runtime spell directories, multiple custom word lists, relative
-  paths, spaces in paths, and missing/empty configurations.
+  paths, spaces and escaped commas in paths, and missing/empty configurations.
+- Discovery independent of `'wildignore'`, including broken source symlinks,
+  and leaving runtime spell directories without word lists alone.
 - Missing binaries and stale binaries, including additions and removals that
   become visible to spell checking during the same editor session.
 - Already-current runtime and first custom dictionaries remaining unchanged
@@ -65,11 +67,20 @@ The 36 tests cover:
 - Preservation of local/global spell options and disabled spell checking,
   without artificial `OptionSet` events during refresh.
 - Rebuilt dictionaries remaining active in other windows that already use them.
+- Read-only sources, unreadable sources, unwritable binaries and directories,
+  and updating an existing writable binary in a read-only directory.
+- Path-specific warnings in `:messages`, compiler and write-time errors,
+  and continuing with other dictionaries after failures, including at startup.
+- Preserving source/binary symlinks and rejecting directories and named pipes
+  as dictionary inputs or outputs without opening them, including during
+  refresh while spell checking is enabled.
 
 The stale-custom-file test deliberately uses an entry after the first one in
 `'spellfile'` to ensure syncing processes more than just the first entry.
 The test runner allows nested events during assertions so option-event checks
 exercise the same hooks that can run during a manual `:SpellSync` invocation.
+The write-time-error test uses Vim's sandbox to deny writes after permission
+checks pass, exercising actual error handling without mocking file operations.
 
 ## Isolation and repeatability
 
@@ -90,10 +101,11 @@ Python's `os.utime()`. No sleeps or filesystem timing races are needed. Editor
 processes are separate so loaded dictionaries and script-local state do not
 leak between tests.
 
-The unreadable-file test requires POSIX permissions and is skipped when the
-current user can still read the protected fixtures (for example, as root).
+Permission tests require POSIX permissions and are skipped when the current
+user bypasses the requested restrictions (for example, as root).
 Symlink tests are skipped when the system does not support or permit creating
-them. These skips are reported by the test runner.
+them. Named-pipe tests require POSIX support. These skips are reported by the
+test runner.
 
 ## Existing defects and future tests
 
@@ -104,9 +116,6 @@ must continue:
 
 | Case | Desired regression assertion |
 | --- | --- |
-| Discovery filters | `'wildignore'` does not hide spell sources. |
-| Escaped paths | Runtime paths and `'spellfile'` entries containing escaped commas are handled correctly. |
-| Permissions | A readable source with a writable destination can be compiled; real failures are diagnosable. |
 | Repeated/late loading | Registration is idempotent and late loading follows the agreed automatic/manual policy. |
 | Timestamp equality/restores | A force-rebuild command or stronger detection handles content changes missed by modification times. |
 
