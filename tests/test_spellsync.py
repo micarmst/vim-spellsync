@@ -333,9 +333,10 @@ class SpellSyncTests(unittest.TestCase):
                     call assert_equal(original_isfname, &isfname)
                     call assert_notmatch('SpellSync:', execute('messages'))
                 """.replace('DIRECTORY', directory), before=r"""
-                    " Windows treats brackets/braces literally; backslashes are separators.
-                    let escapes = has('win32') ? ',' : '[],{}'
-                    let &runtimepath .= ',' . escape(g:test_root . '/DIRECTORY', escapes)
+                    " :help wildcard: Windows uses [[] for a literal bracket.
+                    let directory = g:test_root . '/DIRECTORY'
+                    let directory = has('win32') ? substitute(directory, '\[', '[[]', 'g') : escape(directory, '[]{}')
+                    let &runtimepath .= ',' . escape(directory, ',')
                     call assert_false(empty(globpath(&runtimepath, 'spell', 1, 1)))
                     call TestSpelling()
                     call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
