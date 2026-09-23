@@ -29,6 +29,9 @@ SpellSync also creates `.gitignore` and `.gitattributes` files in
 Vim's spell directories to exclude binary spell files and uses its
 union merge driver to avoid conflicts.
 
+Existing Git configuration is left untouched, including unreadable
+files and symbolic links.
+
 ====================================================================
 2. Usage                                              *SpellSyncUsage*
 
@@ -80,6 +83,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Preserve existing Git configuration entries, including
+           unreadable files and dangling symbolic links
     * FIX: Refresh spell checking without changing word lists or
            recompiling an unchanged first custom dictionary
     * FIX: Preserve an empty 'spellfile' option during refresh

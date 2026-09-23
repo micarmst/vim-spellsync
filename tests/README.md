@@ -41,7 +41,7 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 33 tests cover:
+The 36 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
@@ -53,7 +53,9 @@ The 33 tests cover:
 - Already-current runtime and first custom dictionaries remaining unchanged
   on disk, including after repeated syncing.
 - Generated Git rules in runtime and custom directories, preservation of
-  existing files (including empty ones), and independent Git option opt-outs.
+  existing files (including empty and unreadable ones), symlinks and their
+  targets (including dangling links), directories at Git configuration paths,
+  and independent Git option opt-outs.
 - Preservation of word-list text, banned-word flags, Unicode words, and
   temporary words added with `:spellgood!`.
 - Refreshing new dictionaries with an empty `'spellfile'` or a missing first
@@ -88,6 +90,11 @@ Python's `os.utime()`. No sleeps or filesystem timing races are needed. Editor
 processes are separate so loaded dictionaries and script-local state do not
 leak between tests.
 
+The unreadable-file test requires POSIX permissions and is skipped when the
+current user can still read the protected fixtures (for example, as root).
+Symlink tests are skipped when the system does not support or permit creating
+them. These skips are reported by the test runner.
+
 ## Existing defects and future tests
 
 A passing baseline does not mean every known defect has been fixed. The
@@ -97,7 +104,6 @@ must continue:
 
 | Case | Desired regression assertion |
 | --- | --- |
-| Unreadable existing Git file | Existing `.gitignore` and `.gitattributes` content is never replaced just because it cannot be read. |
 | Discovery filters | `'wildignore'` does not hide spell sources. |
 | Escaped paths | Runtime paths and `'spellfile'` entries containing escaped commas are handled correctly. |
 | Permissions | A readable source with a writable destination can be compiled; real failures are diagnosable. |

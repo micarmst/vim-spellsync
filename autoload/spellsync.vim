@@ -72,7 +72,8 @@ endfunction
 function! s:gitSetupUnionMerge(dir)
   if g:spellsync_enable_git_union_merge
     let l:gitattributes = a:dir . '/.gitattributes'
-    if !filereadable(l:gitattributes)
+    " Preserve all existing entries, including unreadable files and symlinks.
+    if getftype(l:gitattributes) ==# ''
       silent! call writefile([s:gitGenComment, '*.add merge=union'], l:gitattributes)
     endif
   endif
@@ -81,7 +82,8 @@ endfunction
 function! s:gitIgnoreSpellFiles(dir)
   if g:spellsync_enable_git_ignore
     let l:gitignore = a:dir . '/.gitignore'
-    if !filereadable(l:gitignore)
+    " Preserve all existing entries, including unreadable files and symlinks.
+    if getftype(l:gitignore) ==# ''
       silent! call writefile([s:gitGenComment, '*.spl', '*.sug'], l:gitignore)
     endif
   endif

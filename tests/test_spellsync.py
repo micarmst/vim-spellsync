@@ -1,6 +1,7 @@
 """Exercise the public plugin API in an isolated, real Vim or Neovim process."""
 
 import argparse
+import errno
 import json
 import os
 from pathlib import Path
@@ -257,6 +258,85 @@ class SpellSyncTests(unittest.TestCase):
         self.vim("SpellSync", before="let &runtimepath .= ',' . escape(g:test_root . '/second-runtime', ',')")
         for path, content in originals.items():
             self.assertEqual(content, path.read_bytes())
+
+    @unittest.skipUnless(os.name == "posix", "Requires POSIX file permissions")
+    def test_preserves_unreadable_writable_git_files(self):
+        self.wordlist()
+        self.wordlist("custom/words.utf-8.add")
+        originals = {}
+        try:
+            for directory in (self.runtime / "spell", self.root / "custom"):
+                for name in (".gitignore", ".gitattributes"):
+                    path = directory / name
+                    content = ("user rules for " + name + "\n").encode("utf-8")
+                    path.write_bytes(content)
+                    originals[path] = content
+                    path.chmod(0o200)
+                    if os.access(path, os.R_OK):
+                        self.skipTest("Current user can read files despite missing read permission")
+            self.vim("""
+                for directory in ['runtime/spell', 'custom']
+                  for name in ['.gitignore', '.gitattributes']
+                    let path = g:test_root . '/' . directory . '/' . name
+                    call assert_equal(0, filereadable(path), path)
+                    call assert_equal(1, filewritable(path), path)
+                  endfor
+                endfor
+                SpellSync
+            """, before="let &spellfile = g:test_root . '/custom/words.utf-8.add'")
+        finally:
+            # Restore access before checking contents and removing fixtures.
+            for path in originals:
+                path.chmod(0o600)
+        for path, content in originals.items():
+            with self.subTest(path=path.relative_to(self.root)):
+                self.assertEqual(content, path.read_bytes())
+
+    def test_preserves_git_symlinks_and_their_targets(self):
+        self.wordlist()
+        self.wordlist("custom/words.utf-8.add")
+        originals = {}
+        for directory, content in ((self.runtime / "spell", b"user rules\n"),
+                                   (self.root / "custom", None)):
+            for name in (".gitignore", ".gitattributes"):
+                path = directory / name
+                target = directory / ("saved" + name)
+                if content is not None:
+                    target.write_bytes(content)
+                try:
+                    path.symlink_to(target.name)
+                except NotImplementedError:
+                    self.skipTest("Symbolic links are unavailable")
+                except OSError as error:
+                    if error.errno not in (errno.EPERM, errno.EACCES, errno.ENOTSUP):
+                        raise
+                    self.skipTest("Cannot create symbolic links: " + str(error))
+                originals[path] = target, content
+        self.vim("SpellSync", before="let &spellfile = g:test_root . '/custom/words.utf-8.add'")
+        for path, (target, content) in originals.items():
+            with self.subTest(path=path.relative_to(self.root)):
+                self.assertTrue(path.is_symlink())
+                self.assertEqual(target.name, os.readlink(path))
+                if content is None:
+                    self.assertFalse(target.exists(), "A dangling link must not create its target")
+                else:
+                    self.assertEqual(content, target.read_bytes())
+
+    def test_preserves_directories_at_git_config_paths(self):
+        wordlists = [self.wordlist(), self.wordlist("custom/words.utf-8.add")]
+        sentinels = []
+        for wordlist in wordlists:
+            for name in (".gitignore", ".gitattributes"):
+                path = wordlist.parent / name
+                path.mkdir()
+                sentinel = path / "keep.txt"
+                sentinel.write_bytes(b"user content\n")
+                sentinels.append(sentinel)
+        self.vim("SpellSync", before="let &spellfile = g:test_root . '/custom/words.utf-8.add'")
+        for sentinel in sentinels:
+            self.assertEqual(b"user content\n", sentinel.read_bytes())
+        for wordlist in wordlists:
+            self.assertTrue(Path(str(wordlist) + ".spl").is_file())
 
     def test_git_ignore_can_be_disabled_independently(self):
         self.wordlist()
