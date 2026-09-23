@@ -30,6 +30,14 @@ function! spellsync#Run()
   call s:syncSpellDirs()
   call s:syncSpellFiles()
   call s:spellReload()
+  " Buffers (and windows using :ownsyntax) keep their own dictionary lists.
+  " Refresh visible spell-enabled windows without changing focus or events.
+  let l:current = win_getid()
+  for l:window in getwininfo()
+    if l:window.winid != l:current && gettabwinvar(l:window.tabnr, l:window.winnr, '&spell')
+      call win_execute(l:window.winid, 'noautocmd call ' . expand('<SID>') . 'spellReload()')
+    endif
+  endfor
 endfunction
 
 function! s:syncSpellDirs()

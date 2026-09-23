@@ -41,7 +41,7 @@ after each test, including failed tests.
 
 ## Coverage
 
-The 59 tests cover:
+The 63 tests cover:
 
 - Command registration, default options, and preservation of explicit options.
 - Automatic syncing through the actual `VimEnter` event, startup opt-out, and
@@ -69,7 +69,10 @@ The 59 tests cover:
   fallback, without preloading unrelated languages.
 - Preservation of local/global spell options and disabled spell checking,
   without artificial `OptionSet` events during refresh.
-- Rebuilt dictionaries remaining active in other windows that already use them.
+- Rebuilt and newly created dictionaries remaining active across windows,
+  tabs, and hidden-buffer reuse, without changing focus, views, working
+  directories, local options, or generating artificial editor events.
+- Custom sources configured only in other buffers remaining outside the sync.
 - Read-only sources, unreadable sources, unwritable binaries and directories,
   and updating an existing writable binary in a read-only directory.
 - Path-specific warnings in `:messages`, compiler and write-time errors,

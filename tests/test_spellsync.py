@@ -934,6 +934,89 @@ class SpellSyncTests(unittest.TestCase):
             call TestSpelling()
         """)
 
+    def test_new_runtime_dictionary_refreshes_windows_and_tabs(self):
+        self.wordlist()
+        self.vim("""
+            let current = win_getid()
+            let view = winsaveview()
+            let directories = map(getwininfo(), '[v:val.winid, getcwd(v:val.winnr, v:val.tabnr), haslocaldir(v:val.winnr, v:val.tabnr)]')
+            let options = [&l:spell, &l:spellfile, &l:spelllang]
+            let g:refresh_events = 0
+            augroup TestRefreshEvents
+              autocmd OptionSet,WinEnter,WinLeave,BufEnter,BufLeave,TabEnter,TabLeave,DirChanged * let g:refresh_events += 1
+            augroup END
+            SpellSync
+            call assert_equal(current, win_getid())
+            call assert_equal(view, winsaveview())
+            call assert_equal(directories, map(getwininfo(), '[v:val.winid, getcwd(v:val.winnr, v:val.tabnr), haslocaldir(v:val.winnr, v:val.tabnr)]'))
+            call assert_equal(options, [&l:spell, &l:spellfile, &l:spelllang])
+            call assert_equal(0, g:refresh_events)
+            for window in [g:first_window, g:second_window]
+              call win_execute(window, "call assert_equal(['', ''], spellbadword('spellsyncword'))")
+              call win_execute(window, "call assert_equal(['', ''], spellbadword('ephemeralspellsyncword'))")
+            endfor
+            call assert_notmatch('SpellSync:', execute('messages'))
+        """, before="""
+            call TestSpelling()
+            setlocal spellfile=
+            silent spellgood! ephemeralspellsyncword
+            execute 'lcd ' . fnameescape(g:test_root . '/runtime')
+            let g:first_window = win_getid()
+            tabnew
+            execute 'tcd ' . fnameescape(g:test_root)
+            setlocal spelllang=ssbase spell spellfile=
+            let g:second_window = win_getid()
+            new
+            setlocal nospell spellfile=
+        """)
+
+    def test_new_runtime_dictionaries_refresh_each_open_language(self):
+        self.wordlist()
+        self.wordlist('runtime/spell/otherbase.utf-8.add', ['otheradditionword'])
+        self.wordlist('other.words', ['otherbaselineword'])
+        self.vim("""
+            SpellSync
+            call assert_equal(['', ''], spellbadword('otheradditionword'))
+            call assert_equal(['spellsyncword', 'bad'], spellbadword('spellsyncword'))
+            wincmd p
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal(['otheradditionword', 'bad'], spellbadword('otheradditionword'))
+        """, before="""
+            call TestSpelling()
+            execute 'silent mkspell! ' . fnameescape(g:test_root . '/runtime/spell/otherbase.utf-8.spl') . ' ' . fnameescape(g:test_root . '/other.words')
+            new
+            setlocal spelllang=otherbase spell spellfile=
+        """)
+
+    def test_new_runtime_dictionary_is_active_when_hidden_buffer_returns(self):
+        self.wordlist()
+        self.vim("""
+            SpellSync
+            execute 'buffer ' . g:hidden_buffer
+            call assert_equal(['', ''], spellbadword('spellsyncword'))
+            call assert_equal('preserved text', getline(1))
+        """, before="""
+            set hidden
+            call TestSpelling()
+            call setline(1, 'preserved text')
+            let g:hidden_buffer = bufnr('')
+            enew
+            setlocal spelllang=ssbase spell spellfile=
+        """)
+
+    def test_refresh_does_not_compile_other_buffers_custom_sources(self):
+        path = self.wordlist('other-buffer/custom.utf-8.add')
+        self.vim("""
+            SpellSync
+            call assert_false(filereadable(g:test_root . '/other-buffer/custom.utf-8.add.spl'))
+        """, before="""
+            let &l:spellfile = g:test_root . '/other-buffer/custom.utf-8.add'
+            call TestSpelling()
+            new
+            setlocal spelllang=ssbase spell spellfile=
+        """)
+        self.assertFalse(Path(str(path) + '.spl').exists())
+
     def test_rebuilt_dictionary_remains_live_in_other_windows(self):
         path = self.wordlist("custom/words.utf-8.add", ["oldspellsyncword"])
         self.compile(path)

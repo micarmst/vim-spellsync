@@ -50,6 +50,11 @@ again. Set configuration options before loading the plugin; setting
 
     :SpellSync
 
+Runtime word lists and the active buffer's 'spellfile' entries are synced.
+Custom sources configured only in other buffers are not compiled. New runtime
+dictionaries are refreshed in open spell-enabled windows across tabs, while
+preserving options, focus, and in-memory additions from |:spellgood|.
+
 Read-only word lists can be compiled if the binary spell file can
 be created or updated. Missing word lists are skipped.
 
@@ -112,6 +117,8 @@ Contributions are welcome, feel free to submit a pull request:
 7. Changelog                                      *SpellSyncChangelog*
 
 Unreleased
+    * FIX: Activate new runtime dictionaries in other spell-enabled windows
+           and tabs while preserving local options and editor state
     * FIX: Discover literal directory names containing glob characters
            and report unreadable spell directories without stopping the sync
     * FIX: Register startup syncing once and honor startup settings when
