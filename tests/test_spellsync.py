@@ -282,7 +282,7 @@ class SpellSyncTests(unittest.TestCase):
             let &runtimepath .= ',' . escape(g:test_root . '/runtime', ',')
             let &spellfile = g:test_root . '/runtime/spell/ssbase.utf-8.add,runtime/spell/ssbase.utf-8.add'
             if has('win32')
-              let &spellfile .= ',' . toupper(g:test_root . '/runtime/spell/ssbase.utf-8.add')
+              let &spellfile .= ',' . toupper(g:test_root . '/runtime/spell/ssbase.utf-8') . '.add'
             endif
         """)
         # Observe the real compiler's verbose log, without replacing :mkspell
