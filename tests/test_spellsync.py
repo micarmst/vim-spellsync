@@ -261,7 +261,7 @@ class SpellSyncTests(unittest.TestCase):
             call assert_notmatch('SpellSync:', execute('messages'))
         """, before="""
             " Older Vim rejects the comma escape unless it is in 'isfname'.
-            if !has('nvim') && !has('patch-9.1.783')
+            if (has('nvim') ? !has('nvim-0.11') : !has('patch-9.1.783'))
               set isfname+=92
             endif
             let &spellfile = escape(g:test_root . '/custom, words/words.utf-8.add', ',')
@@ -596,7 +596,9 @@ class SpellSyncTests(unittest.TestCase):
         self.symlink(link, "missing.words")
         self.vim("""
             SpellSync
-            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add', 'not a regular file')
+            " Windows Vim reports dangling links as unreadable files.
+            let reason = has('win32') && !has('nvim') ? 'not readable' : 'not a regular file'
+            call TestWarning(g:test_root . '/runtime/spell/aa.utf-8.add', reason)
         """)
         self.assertTrue(link.is_symlink())
         self.assertFalse((link.parent / "missing.words").exists())

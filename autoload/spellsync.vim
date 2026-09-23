@@ -157,9 +157,9 @@ endfunction
 function! s:setSpellOption(option, value) abort
   let l:isfname = &isfname
   try
-    " Before 9.1.0783 Vim validates the escape in '\,' as a filename
+    " Vim before 9.1.0783 and Neovim before 0.11 validate the escape in '\,' as a filename
     " character, although its option parser already understands the escape.
-    if a:option ==# 'spellfile' && !has('nvim') && !has('patch-9.1.783')
+    if a:option ==# 'spellfile' && (has('nvim') ? !has('nvim-0.11') : !has('patch-9.1.783'))
       silent noautocmd set isfname+=92
     endif
     execute 'silent noautocmd let &l:' . a:option . ' = a:value'

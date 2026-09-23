@@ -56,7 +56,7 @@ If a binary path points to a directory or other non-file entry, the
 final spell refresh is deferred until that path is fixed. Other
 dictionaries are still rebuilt.
 
-On Vim before 9.1.0783, use `set isfname+=92` before assigning a
+On Vim before 9.1.0783 or Neovim before 0.11, use `set isfname+=92` before assigning a
 custom 'spellfile' path containing an escaped comma. SpellSync handles
 this limitation itself when refreshing runtime dictionaries, restoring
 the original 'isfname' afterwards.

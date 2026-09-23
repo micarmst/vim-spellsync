@@ -138,7 +138,7 @@ Each job prints the actual editor version.
 
 The matrix also tests the compatibility baselines, Vim 8.2.1926 and Neovim
 0.5.0, on Linux. Running against an older executable locally uses the same
-`--editor` argument. Vim before 9.1.0783 needs 'isfname' to include backslash
+`--editor` argument. Vim before 9.1.0783 and Neovim before 0.11 need 'isfname' to include backslash
 when assigning escaped commas to 'spellfile'; the custom-path fixture applies
 that editor workaround, while the runtime-path test verifies that the plugin
 handles it and restores 'isfname'. Windows warning assertions normalize path
