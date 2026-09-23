@@ -236,7 +236,9 @@ function! s:spellReload()
       if !s:canLoadSpellFile(l:file)
         return
       endif
-      call add(l:wordlists, escape(fnamemodify(l:file, ':r'), '\,'))
+      " Only commas are separators in this option. Doubling native Windows
+      " backslashes creates a second cache entry that :mkspell may not reload.
+      call add(l:wordlists, escape(fnamemodify(l:file, ':r'), ','))
     endfor
   endfor
 
